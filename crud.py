@@ -4,6 +4,7 @@ from schemas import UserCreate, ArticleCreate
 from auth import hash_password
 from fastapi import HTTPException
 import json
+from datetime import datetime
 
 # ---------------------- USER OPERATIONS ----------------------
 
@@ -51,10 +52,35 @@ def get_article(db: Session, article_id: int):
         article.tags = json.loads(article.tags) if isinstance(article.tags, str) else article.tags
     return article
 
-def delete_article(db: Session, article_id: int):
+def update_article(db: Session, article_id: int, article_data: ArticleCreate, user_id: int):
     article = db.query(ArticleDB).filter(ArticleDB.id == article_id).first()
-    if article:
-        db.delete(article)
-        db.commit()
-        return True
-    return False  # Return False if article was not found
+    
+    if not article:
+        raise HTTPException(status_code=404, detail="Article not found")
+    
+    if article.user_id != user_id:
+        raise HTTPException(status_code=403, detail="Not authorized to update this article")
+
+    article.title = article_data.title
+    article.content = article_data.content
+    article.tags = json.dumps(article_data.tags)  # Ensure tags are stored as JSON
+    article.updated_date = datetime.utcnow()
+
+    db.commit()
+    db.refresh(article)
+
+    article.tags = json.loads(article.tags)  # Convert back to list before returning
+    return article
+
+def delete_article(db: Session, article_id: int, user_id: int):
+    article = db.query(ArticleDB).filter(ArticleDB.id == article_id).first()
+    
+    if not article:
+        raise HTTPException(status_code=404, detail="Article not found")
+    
+    if article.user_id != user_id:
+        raise HTTPException(status_code=403, detail="Not authorized to delete this article")
+
+    db.delete(article)
+    db.commit()
+    return True
