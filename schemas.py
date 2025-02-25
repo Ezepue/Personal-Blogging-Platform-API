@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
+import json
 
 # User Schema
 class UserCreate(BaseModel):
@@ -12,21 +13,29 @@ class UserResponse(BaseModel):
     username: str
 
     class Config:
-        from_attributes = True  # Ensures ORM compatibility
+        from_attributes = True  # Enables ORM compatibility
 
 # Article Schema
-class ArticleBase(BaseModel):
+class ArticleCreate(BaseModel):
     title: str
     content: str
     tags: Optional[List[str]] = []
     published_date: datetime = datetime.utcnow()
-    updated_date: Optional[datetime] = None
 
-class ArticleCreate(ArticleBase):
-    pass  # Inherits everything from ArticleBase
-
-class ArticleResponse(ArticleBase):
-    id: int  # Add article ID for responses
+class ArticleResponse(BaseModel):
+    id: int
+    title: str
+    content: str
+    tags: List[str]
+    published_date: datetime
+    updated_date: Optional[datetime]
+    user_id: int
+    
+    @classmethod
+    def from_orm(cls, obj):
+        """Ensure tags is always returned as a list"""
+        tags = json.loads(obj.tags) if isinstance(obj.tags, str) else obj.tags
+        return cls(id=obj.id, title=obj.title, content=obj.content, tags=tags)
 
     class Config:
-        from_attributes = True  # Ensures ORM compatibility
+        from_attributes = True
