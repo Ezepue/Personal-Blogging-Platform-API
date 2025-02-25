@@ -36,6 +36,11 @@ class ArticleResponse(BaseModel):
         """Ensure tags is always returned as a list"""
         tags = json.loads(obj.tags) if isinstance(obj.tags, str) else obj.tags
         return cls(id=obj.id, title=obj.title, content=obj.content, tags=tags)
+    
+class ArticleUpdate(BaseModel):
+    title: Optional[str] = None
+    content: Optional[str] = None
+    tags: Optional[List[str]] = None
 
     class Config:
         from_attributes = True
