@@ -96,7 +96,6 @@ This project is licensed under the MIT License.
 
 ## 💡 Future Improvements
 - ✅ User Roles (Admin, Author, Reader)
-- ✅ Comment System
 - ✅ Image Uploads
 - ✅ WebSocket for Real-time Updates
 
