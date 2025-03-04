@@ -73,6 +73,17 @@ API will be live at: **`http://127.0.0.1:8000`**
 - **GET** `/articles/{id}/` - Get a single article by ID
 - **PUT** `/articles/{id}/` - Update an article
 - **DELETE** `/articles/{id}/` - Delete an article
+- **DELETE** `/articles/{id}/` - Delete an article
+- **POST** `/articles/{id}/like` - Like  Post
+- **POST** `/articles/{id}/unlike` - Unlike Post
+- **GET** `/articles/{id}/likes` - Get Likes
+- **POST** `/comments/{article_id}/comments` - Add comment
+- **GET** `/comments/{article_id}/comments` - Get comments
+- **DELETE** `/comments/{comment_id}/comments` - Delete comments
+
+
+
+
 
 ### 🔍 API Documentation
 - **Swagger UI:** `http://127.0.0.1:8000/docs`

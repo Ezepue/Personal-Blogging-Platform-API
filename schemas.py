@@ -1,37 +1,38 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, SecretStr
 from typing import List, Optional
 from datetime import datetime
-from models import ArticleStatus
+from models import ArticleStatus  # Ensure this is correctly defined in models.py
 
 # User Schema
 class UserCreate(BaseModel):
     username: str
-    password: str
+    email: str
+    password: SecretStr  # Ensures password is not exposed in logs or responses
 
 class UserResponse(BaseModel):
     id: int
     username: str
 
     class Config:
-        from_attributes = True  
+        from_attributes = True  # Ensures compatibility with ORM models
 
 # Article Schema
 class ArticleCreate(BaseModel):
     title: str
     content: str
-    tags: Optional[List[str]] = []
+    tags: List[str] = []  # Default to empty list instead of None
     category: Optional[str] = None
-    status: ArticleStatus = ArticleStatus.DRAFT  # Fix: Use enum for status
+    status: ArticleStatus = ArticleStatus.DRAFT  # Uses Enum for status
 
 class ArticleResponse(BaseModel):
     id: int
     title: str
     content: str
     tags: List[str]
-    category: Optional[str]
+    category: Optional[str] = None
     status: ArticleStatus  
-    published_date: Optional[datetime]  
-    updated_date: Optional[datetime]
+    published_date: Optional[datetime] = None  # Explicitly set default to None
+    updated_date: Optional[datetime] = None  
     user_id: int
 
     class Config:
@@ -40,7 +41,7 @@ class ArticleResponse(BaseModel):
 class ArticleUpdate(BaseModel):
     title: Optional[str] = None
     content: Optional[str] = None
-    tags: Optional[List[str]] = None
+    tags: Optional[List[str]] = []  # Default to empty list to prevent None issues
     category: Optional[str] = None
     status: Optional[ArticleStatus] = None  
 
@@ -56,7 +57,7 @@ class CommentResponse(BaseModel):
     content: str
     user_id: int
     article_id: int
-    created_date: datetime  # Fix: renamed from created_at
+    created_date: datetime  # Ensures consistency with database field names
 
     class Config:
         from_attributes = True  

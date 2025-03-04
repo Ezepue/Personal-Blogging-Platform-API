@@ -1,26 +1,45 @@
 from sqlalchemy.orm import Session
-from models import UserDB, ArticleDB, LikeDB, CommentDB, ArticleStatus
+from models import UserDB, ArticleDB, LikeDB, CommentDB, ArticleStatus, UserRole
 from schemas import UserCreate, ArticleCreate, ArticleUpdate, CommentCreate
 from auth import hash_password
-from fastapi import HTTPException
+from fastapi import HTTPException, status 
 from datetime import datetime
 
 # ---------------------- USER OPERATIONS ----------------------
 
 def create_user(db: Session, user: UserCreate):
+    # Check if username is already taken
     existing_user = db.query(UserDB).filter(UserDB.username == user.username).first()
     if existing_user:
-        raise HTTPException(status_code=400, detail="Username already taken!")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="Username already taken!"
+        )
+    
+    # Check if email is already registered (optional but recommended)
+    existing_email = db.query(UserDB).filter(UserDB.email == user.email).first()
+    if existing_email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email already registered!"
+        )
 
+    # Hash the password
     hashed_password = hash_password(user.password)
-    db_user = UserDB(username=user.username, hashed_password=hashed_password)
+
+    # Create new user entry
+    db_user = UserDB(
+        username=user.username,
+        email=user.email,  # ✅ Ensure email is saved
+        hashed_password=hashed_password,
+        role="reader"  # ✅ Default role assigned
+    )
 
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
 
     return db_user
-
 # ---------------------- ARTICLE OPERATIONS ----------------------
 
 def create_article(db: Session, article_data: ArticleCreate, user_id: int):
@@ -29,7 +48,7 @@ def create_article(db: Session, article_data: ArticleCreate, user_id: int):
     db_article = ArticleDB(
         title=article_data.title,
         content=article_data.content,
-        tags=article_data.tags,  # JSON already handled by SQLAlchemy
+        tags=article_data.tags or [],  # Ensure tags are an empty list if None
         category=article_data.category,
         status=article_data.status,
         published_date=published_date,
@@ -42,7 +61,17 @@ def create_article(db: Session, article_data: ArticleCreate, user_id: int):
 
     return db_article
 
-def get_articles(db: Session, title: str = None, tag: str = None, category: str = None, user_id: int = None, status: ArticleStatus = None, limit: int = 10, offset: int = 0):
+def get_articles(
+    db: Session, 
+    user: UserDB,  
+    title: str = None, 
+    tag: str = None, 
+    category: str = None, 
+    user_id: int = None, 
+    status: ArticleStatus = None, 
+    limit: int = 10, 
+    offset: int = 0
+):
     query = db.query(ArticleDB)
 
     if title:
@@ -59,6 +88,10 @@ def get_articles(db: Session, title: str = None, tag: str = None, category: str 
     
     if status:
         query = query.filter(ArticleDB.status == status)
+
+    # Role-based filtering: Readers can only see published articles
+    if user.role == UserRole.reader:
+        query = query.filter(ArticleDB.status == ArticleStatus.PUBLISHED)
 
     return query.limit(limit).offset(offset).all()
 
@@ -83,8 +116,9 @@ def update_article(db: Session, article_id: int, article_data: ArticleUpdate, us
     if article_data.category is not None:
         article.category = article_data.category
     if article_data.status is not None:
+        if article.status != article_data.status and article_data.status == ArticleStatus.PUBLISHED:
+            article.published_date = datetime.utcnow()
         article.status = article_data.status
-        article.published_date = datetime.utcnow() if article_data.status == ArticleStatus.PUBLISHED else None
 
     article.updated_date = datetime.utcnow()
 
@@ -104,7 +138,7 @@ def delete_article(db: Session, article_id: int, user_id: int):
 
     db.delete(article)
     db.commit()
-    return True
+    return {"message": "Article deleted successfully"}
 
 # ---------------------- LIKE OPERATIONS ----------------------
 
@@ -116,6 +150,7 @@ def like_article(db: Session, article_id: int, user_id: int):
     like = LikeDB(user_id=user_id, article_id=article_id)
     db.add(like)
     db.commit()
+    db.refresh(like)  # Ensures session updates before returning
     return {"message": "Article liked"}
 
 def unlike_article(db: Session, article_id: int, user_id: int):
