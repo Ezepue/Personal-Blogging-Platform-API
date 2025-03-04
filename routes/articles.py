@@ -133,3 +133,34 @@ def unlike_post(
 def get_likes(id: int, db: Session = Depends(get_db)):
     """ Get the number of likes for an article. """
     return {"likes": get_article_likes(db, id)}
+
+
+@router.get("/articles/{id}")
+def get_article(id: int, db: Session = Depends(get_db), user: UserDB = Depends(get_current_user, use_cache=True)):
+    """ Get a single article. Public users can only see published articles. """
+    article = db.query(Article).filter(Article.id == id).first()
+    if not article:
+        raise HTTPException(status_code=404, detail="Article not found")
+    
+    if not article.published and (not user or article.author_id != user.id):
+        raise HTTPException(status_code=403, detail="Unauthorized to view this article")
+
+    return article
+
+@router.get("/articles/")
+def get_articles(db: Session = Depends(get_db)):
+    """ Get all published articles (Public Access) """
+    return db.query(Article).filter(Article.published == True).all()
+
+@router.get("/articles/me/")
+def get_my_articles(user: UserDB = Depends(get_current_user), db: Session = Depends(get_db)):
+    """ Get all articles created by the authenticated user (including drafts). """
+    return db.query(Article).filter(Article.author_id == user.id).all()
+
+@router.get("/articles/all/")
+def get_all_articles(user: UserDB = Depends(get_current_user), db: Session = Depends(get_db)):
+    """ Get all articles (Admins Only). """
+    if user.role not in [UserRole.admin, UserRole.super_admin]:
+        raise HTTPException(status_code=403, detail="Only admins can access this")
+
+    return db.query(Article).all()

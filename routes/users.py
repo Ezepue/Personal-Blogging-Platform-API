@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session
 from schemas import UserCreate, UserResponse
 from database import get_db
@@ -10,13 +12,21 @@ from models import UserDB, UserRole
 
 router = APIRouter()
 
+# ✅ Define a local rate limiter
+limiter = Limiter(key_func=get_remote_address)
+
 @router.post("/register/", response_model=UserResponse)
 def register_user(user: UserCreate, db: Session = Depends(get_db)):
     """ Register a new user with default role 'reader'. """
     return create_user(db, user)
 
 @router.post("/login/")
-def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+@limiter.limit("3/minute")
+def login(
+    request: Request,  # ✅ Added request parameter
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db)
+):
     """ Authenticate user and return JWT access token. """
     user = authenticate_user(db, form_data.username, form_data.password)
     if user is None:
@@ -41,7 +51,7 @@ def read_users_me(current_user: UserDB = Depends(get_current_user)):
 @router.put("/{user_id}/role")
 def change_user_role(
     user_id: int, 
-    new_role: dict,  #Expecting JSON {"role": "admin"}
+    new_role: dict,  # Expecting JSON {"role": "admin"}
     db: Session = Depends(get_db), 
     user: UserDB = Depends(get_current_user)
 ):
@@ -57,7 +67,7 @@ def change_user_role(
     if role_str not in UserRole.__members__:
         raise HTTPException(status_code=400, detail="Invalid role")
 
-    db_user.role = UserRole[role_str]  #Convert string to Enum safely
+    db_user.role = UserRole[role_str]  # Convert string to Enum safely
     db.commit()
     db.refresh(db_user)
     return {"detail": f"User {db_user.username} role updated to {db_user.role.value}"}
@@ -92,8 +102,8 @@ def create_super_admin(user_data: UserCreate, db: Session = Depends(get_db)):
     new_user = UserDB(
         username=user_data.username,
         email=user_data.email,
-        hashed_password=hash_password(user_data.password),  #Hash password
-        role=UserRole.super_admin.value  #Assign Super Admin role
+        hashed_password=hash_password(user_data.password),  # Hash password
+        role=UserRole.super_admin.value  # Assign Super Admin role
     )
     db.add(new_user)
     db.commit()

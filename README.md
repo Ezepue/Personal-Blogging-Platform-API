@@ -44,7 +44,7 @@ pip install -r requirements.txt
 ### 4️⃣ Configure the Database
 Update the `DATABASE_URL` in `config.py`:
 ```python
-DATABASE_URL = "postgresql://username:password@localhost:5432/blogdb"
+SQLALCHEMY_DATABASE_URL = "sqlite:///./blog.db"
 ```
 
 ### 5️⃣ Run Migrations
@@ -147,5 +147,5 @@ This project is licensed under the MIT License.
 
 4. **Notification System (Optional Enhancement)**  
    - Notify users when their article is liked or commented on.  
-   
+
 ---

@@ -62,14 +62,14 @@ def create_article(db: Session, article_data: ArticleCreate, user_id: int):
     return db_article
 
 def get_articles(
-    db: Session, 
-    user: UserDB,  
-    title: str = None, 
-    tag: str = None, 
-    category: str = None, 
-    user_id: int = None, 
-    status: ArticleStatus = None, 
-    limit: int = 10, 
+    db: Session,
+    user: UserDB,
+    title: str = None,
+    tag: str = None,
+    category: str = None,
+    user_id: int = None,
+    status: ArticleStatus = None,
+    limit: int = 10,
     offset: int = 0
 ):
     query = db.query(ArticleDB)
@@ -93,7 +93,19 @@ def get_articles(
     if user.role == UserRole.reader:
         query = query.filter(ArticleDB.status == ArticleStatus.PUBLISHED)
 
-    return query.limit(limit).offset(offset).all()
+    total_articles = query.count()  # Get total count before pagination
+
+    articles = query.limit(limit).offset(offset).all()
+
+    return {
+        "total": total_articles,
+        "limit": limit,
+        "offset": offset,
+        "page": (offset // limit) + 1,
+        "total_pages": (total_articles // limit) + (1 if total_articles % limit > 0 else 0),
+        "articles": articles
+    }
+
 
 def get_article(db: Session, article_id: int):
     return db.query(ArticleDB).filter(ArticleDB.id == article_id).first()

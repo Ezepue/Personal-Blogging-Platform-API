@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import List  # Import List for response model
 from schemas import CommentCreate, CommentResponse
@@ -31,10 +31,14 @@ def add_comment(
 
     return new_comment
 
-@router.get("/{article_id}/comments", response_model=List[CommentResponse])
-def get_comments(article_id: int, db: Session = Depends(get_db)):
-    """ Retrieve all comments for a specific article. """
-    comments = db.query(CommentDB).filter(CommentDB.article_id == article_id).all()
+def get_comments(
+    article_id: int,
+    db: Session = Depends(get_db),
+    limit: int = Query(10, alias="limit"),
+    offset: int = Query(0, alias="offset")
+):
+    """ Retrieve paginated comments for an article """
+    comments = db.query(CommentDB).filter(CommentDB.article_id == article_id).offset(offset).limit(limit).all()
     return comments
 
 @router.delete("/comments/{comment_id}")
