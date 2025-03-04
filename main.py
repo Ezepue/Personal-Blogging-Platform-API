@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from database import Base, engine
-from routes import users, articles, comments
+from routes import users, articles, comments, admin
 
 # Initialize FastAPI app
 app = FastAPI()
@@ -12,3 +12,4 @@ Base.metadata.create_all(bind=engine)
 app.include_router(users.router, prefix="/users", tags=["Users"])
 app.include_router(articles.router, prefix="/articles", tags=["Articles"])
 app.include_router(comments.router, prefix="/comments", tags=["Comments"])
+app.include_router(admin.router, prefix="/admin", tags=["Admin"])

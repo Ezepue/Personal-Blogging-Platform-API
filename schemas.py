@@ -1,7 +1,7 @@
 from pydantic import BaseModel, SecretStr
 from typing import List, Optional
 from datetime import datetime
-from models import ArticleStatus  # Ensure this is correctly defined in models.py
+from models import ArticleStatus, UserRole 
 
 # User Schema
 class UserCreate(BaseModel):
@@ -9,6 +9,9 @@ class UserCreate(BaseModel):
     email: str
     password: SecretStr  # Ensures password is not exposed in logs or responses
 
+class PromoteUserRequest(BaseModel):
+    user_id: int
+    new_role: UserRole
 class UserResponse(BaseModel):
     id: int
     username: str

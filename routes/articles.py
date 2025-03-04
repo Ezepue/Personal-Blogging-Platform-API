@@ -23,7 +23,7 @@ def create_new_article(
     if user.role not in [UserRole.author, UserRole.admin]:  
         raise HTTPException(status_code=403, detail="Only authors and admins can create articles")
 
-    tags = article.tags if isinstance(article.tags, list) else []  # Ensure tags is a list
+    tags = article.tags if isinstance(article.tags, list) else []  #Ensure tags is a list
     
     return create_article(
         db,

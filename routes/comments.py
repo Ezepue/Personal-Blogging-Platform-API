@@ -13,7 +13,7 @@ def add_comment(
     article_id: int, 
     comment: CommentCreate, 
     db: Session = Depends(get_db), 
-    user: UserDB = Depends(get_current_user)  # ✅ Explicit typing
+    user: UserDB = Depends(get_current_user)  #Explicit typing
 ):
     """ Add a comment to an article. """
     article = db.query(ArticleDB).filter(ArticleDB.id == article_id).first()
@@ -41,7 +41,7 @@ def get_comments(article_id: int, db: Session = Depends(get_db)):
 def delete_comment(
     comment_id: int, 
     db: Session = Depends(get_db), 
-    user: UserDB = Depends(get_current_user)  # ✅ Explicit typing
+    user: UserDB = Depends(get_current_user)  #Explicit typing
 ):
     """ Delete a comment. Only the comment owner can delete their comment. """
     comment = db.query(CommentDB).filter(CommentDB.id == comment_id).first()

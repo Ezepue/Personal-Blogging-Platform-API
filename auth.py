@@ -4,7 +4,7 @@ from passlib.context import CryptContext
 import jwt
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
-from pydantic import SecretStr  # ✅ Import SecretStr
+from pydantic import SecretStr
 from models import UserDB, UserRole
 from database import get_db
 
@@ -17,7 +17,7 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 def hash_password(password: SecretStr):
     """Hash password securely"""
-    return pwd_context.hash(password.get_secret_value())  # ✅ Extract secret value
+    return pwd_context.hash(password.get_secret_value())  #Extract secret value
 
 def verify_password(plain_password: str, hashed_password: str):
     """Verify hashed password"""

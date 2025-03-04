@@ -30,9 +30,9 @@ def create_user(db: Session, user: UserCreate):
     # Create new user entry
     db_user = UserDB(
         username=user.username,
-        email=user.email,  # ✅ Ensure email is saved
+        email=user.email,  # Ensure email is saved
         hashed_password=hashed_password,
-        role="reader"  # ✅ Default role assigned
+        role="reader"  # Default role assigned
     )
 
     db.add(db_user)
