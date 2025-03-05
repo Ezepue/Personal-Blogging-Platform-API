@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+SQLAlchemy
+pydantic
+python-dotenv
+passlib[bcrypt]
+python-jose[cryptography]
+PyMySQL
+slowapi

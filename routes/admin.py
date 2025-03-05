@@ -1,34 +1,91 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from typing import List
 from database import get_db
-from models import UserDB, UserRole
-from schemas import PromoteUserRequest
-from auth import get_current_user
+from schemas.article import ArticleResponse
+from schemas.comment import CommentResponse
+from models.enums import UserRole
+from schemas.user import UserResponse
+from utils.auth_helpers import get_current_user, is_admin, is_super_admin
+from utils.db_helpers import (
+    get_all_users, promote_user, delete_article, delete_comment, 
+    get_all_articles, get_all_comments
+)
+from models.user import UserDB
 
 router = APIRouter()
 
-@router.put("/admin/promote", response_model=dict)
-def promote_user(
-    request: PromoteUserRequest,
+@router.get("/users", response_model=List[UserResponse])
+def list_users(
     db: Session = Depends(get_db),
     current_user: UserDB = Depends(get_current_user)
 ):
-    # Ensure only Super Admins can promote users
-    if current_user.role != UserRole.super_admin:
-        raise HTTPException(status_code=403, detail="Only Super Admins can promote users.")
+    """ Super admins can view all users. """
+    if not is_super_admin(current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access restricted to super admins.")
+    
+    return get_all_users(db)
 
-    # Find the target user
-    user = db.query(UserDB).filter(UserDB.id == request.user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found.")
+@router.post("/promote/{user_id}")
+def promote_to_admin(
+    user_id: int,
+    role: str,  # Expecting "admin" or "super_admin"
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user)
+):
+    """ Super admins can promote users to admin or super admin. """
+    if not is_super_admin(current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access restricted to super admins.")
+    
+    if role not in UserRole.__members__:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid role.")
 
-    # Prevent demoting Super Admins
-    if user.role == UserRole.super_admin and request.new_role != UserRole.super_admin:
-        raise HTTPException(status_code=403, detail="Cannot demote a Super Admin.")
+    return promote_user(db, user_id, UserRole[role])
 
-    # Update role
-    user.role = request.new_role
-    db.commit()
-    db.refresh(user)
+@router.get("/articles", response_model=List[ArticleResponse])
+def list_all_articles(
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user)
+):
+    """ Admins can view all articles. """
+    if not is_admin(current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admins only.")
 
-    return {"message": f"User {user.username} promoted to {user.role.value}."}
+    return get_all_articles(db)
+
+@router.delete("/articles/{article_id}")
+def remove_article(
+    article_id: int,
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user)
+):
+    """ Admins can delete any article. """
+    if not is_admin(current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admins only.")
+
+    delete_article(db, article_id)
+    return {"detail": "Article deleted successfully"}
+
+@router.get("/comments", response_model=List[CommentResponse])
+def list_all_comments(
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user)
+):
+    """ Admins can view all comments. """
+    if not is_admin(current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admins only.")
+
+    return get_all_comments(db)
+
+@router.delete("/comments/{comment_id}")
+def remove_comment(
+    comment_id: int,
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user)
+):
+    """ Admins can delete any comment. """
+    if not is_admin(current_user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admins only.")
+
+    delete_comment(db, comment_id)
+    return {"detail": "Comment deleted successfully"}

@@ -1,60 +1,51 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List  # Import List for response model
-from schemas import CommentCreate, CommentResponse
+from typing import List
 from database import get_db
-from models import CommentDB, ArticleDB, UserDB
-from auth import get_current_user
+from schemas.comment import CommentCreate, CommentResponse
+from utils.auth_helpers import get_current_user, is_admin
+from utils.db_helpers import (
+    create_new_comment, get_comments_by_article, get_comment_by_id, delete_comment
+)
+from models.user import UserDB
 
 router = APIRouter()
 
-@router.post("/{article_id}/comments", response_model=CommentResponse)
+@router.post("/", response_model=CommentResponse)
 def add_comment(
-    article_id: int, 
-    comment: CommentCreate, 
-    db: Session = Depends(get_db), 
-    user: UserDB = Depends(get_current_user)  #Explicit typing
+    comment: CommentCreate,
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user)
 ):
-    """ Add a comment to an article. """
-    article = db.query(ArticleDB).filter(ArticleDB.id == article_id).first()
-    if not article:
-        raise HTTPException(status_code=404, detail="Article not found")
+    """ Allow authenticated users to comment on articles. """
+    return create_new_comment(db, comment, author_id=current_user.id)
 
-    new_comment = CommentDB(
-        content=comment.content, 
-        user_id=user.id, 
-        article_id=article_id
-    )
-    db.add(new_comment)
-    db.commit()
-    db.refresh(new_comment)
-
-    return new_comment
-
-def get_comments(
+@router.get("/{article_id}", response_model=List[CommentResponse])
+def list_comments(
     article_id: int,
     db: Session = Depends(get_db),
-    limit: int = Query(10, alias="limit"),
-    offset: int = Query(0, alias="offset")
+    skip: int = 0,
+    limit: int = 10
 ):
-    """ Retrieve paginated comments for an article """
-    comments = db.query(CommentDB).filter(CommentDB.article_id == article_id).offset(offset).limit(limit).all()
-    return comments
+    """ Retrieve comments for a specific article with pagination. """
+    return get_comments_by_article(db, article_id, skip, limit)
 
-@router.delete("/comments/{comment_id}")
-def delete_comment(
-    comment_id: int, 
-    db: Session = Depends(get_db), 
-    user: UserDB = Depends(get_current_user)  #Explicit typing
+@router.delete("/{comment_id}")
+def remove_comment(
+    comment_id: int,
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user)
 ):
-    """ Delete a comment. Only the comment owner can delete their comment. """
-    comment = db.query(CommentDB).filter(CommentDB.id == comment_id).first()
+    """ Allow authors and admins to delete comments. """
+    comment = get_comment_by_id(db, comment_id)
     if not comment:
-        raise HTTPException(status_code=404, detail="Comment not found")
-    
-    if comment.user_id != user.id:
-        raise HTTPException(status_code=403, detail="Not authorized to delete this comment")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found")
 
-    db.delete(comment)
-    db.commit()
+    if comment.author_id != current_user.id and not is_admin(current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only delete your own comments"
+        )
+
+    delete_comment(db, comment_id)
     return {"detail": "Comment deleted successfully"}
