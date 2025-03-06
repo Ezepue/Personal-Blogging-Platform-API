@@ -9,7 +9,7 @@ class LikeDB(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     article_id = Column(Integer, ForeignKey("articles.id", ondelete="CASCADE"), nullable=False)
 
-    __table_args__ = (UniqueConstraint("user_id", "article_id", name="unique_like"),)
+    # __table_args__ = (UniqueConstraint("user_id", "article_id", name="unique_like"),)
 
     article = relationship("ArticleDB", back_populates="likes")
     user = relationship("UserDB", back_populates="likes")

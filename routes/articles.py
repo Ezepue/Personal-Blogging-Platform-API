@@ -5,8 +5,8 @@ from database import get_db
 from schemas.article import ArticleCreate, ArticleUpdate, ArticleResponse
 from utils.auth_helpers import get_current_user, is_admin
 from utils.db_helpers import (
-    create_new_article, get_article_by_id, get_all_articles, 
-    update_article, delete_article
+    create_new_article, get_article_by_id, 
+    update_article, delete_article, get_articles
 )
 from models.user import UserDB
 
@@ -30,7 +30,7 @@ def list_articles(
     limit: int = 10
 ):
     """ Fetch all articles with optional search and category filters. """
-    return get_all_articles(db, search, category, skip, limit)
+    return get_articles(db, search, category, skip, limit)
 
 @router.get("/{article_id}", response_model=ArticleResponse)
 def read_article(article_id: int, db: Session = Depends(get_db)):

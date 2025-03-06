@@ -48,7 +48,7 @@ def create_new_article(db: Session, article_data: ArticleCreate, author_id: int)
         title=article_data.title,
         content=article_data.content,
         category=article_data.category,
-        user_id=author_id,  # Fixed author_id reference
+        author_id=author_id,  # Fixed author_id reference
         status=article_data.status
     )
     db.add(new_article)
@@ -71,11 +71,6 @@ def get_articles(db: Session, search: str = None, category: str = None, skip: in
 def get_article_by_id(db: Session, article_id: int):
     """Retrieve an article by its ID."""
     return db.query(ArticleDB).filter(ArticleDB.id == article_id).first()
-
-def get_all_articles(db: Session, skip: int = 0, limit: int = 10):
-    """Retrieve all articles with pagination."""
-    return db.query(ArticleDB).offset(skip).limit(limit).all()
-
 
 def update_article(db: Session, article: ArticleDB, article_data: ArticleUpdate):
     """Update an article's fields."""

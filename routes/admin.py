@@ -9,7 +9,7 @@ from schemas.user import UserResponse
 from utils.auth_helpers import get_current_user, is_admin, is_super_admin
 from utils.db_helpers import (
     get_all_users, promote_user, delete_article, delete_comment, 
-    get_all_articles, get_all_comments
+    get_articles, get_all_comments
 )
 from models.user import UserDB
 
@@ -51,7 +51,7 @@ def list_all_articles(
     if not is_admin(current_user):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admins only.")
 
-    return get_all_articles(db)
+    return get_articles(db)
 
 @router.delete("/articles/{article_id}")
 def remove_article(

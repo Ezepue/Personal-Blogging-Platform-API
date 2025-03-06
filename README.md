@@ -136,16 +136,6 @@ This project is licensed under the MIT License.
 ---
 
 ### ❓ Missing or Unconfirmed Features:
-1. **Admin Panel (Optional)**  
-   - A separate admin dashboard for managing users, articles, etc.  
-
-2. **Pagination for Articles & Comments**  
-   - If you have many posts or comments, you might need pagination.  
-
-3. **Rate Limiting (Optional for security)**  
-   - Prevent excessive requests (e.g., brute-force login attempts).  
-
-4. **Notification System (Optional Enhancement)**  
+   
+   1. **Notification System (Optional Enhancement)**  
    - Notify users when their article is liked or commented on.  
-
----

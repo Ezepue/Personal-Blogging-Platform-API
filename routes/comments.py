@@ -8,6 +8,9 @@ from utils.db_helpers import (
     create_new_comment, get_comments_by_article, get_comment_by_id, delete_comment
 )
 from models.user import UserDB
+from models.comment import CommentDB
+from models.article import ArticleDB
+from models.user import UserDB
 
 router = APIRouter()
 
@@ -37,11 +40,17 @@ def remove_comment(
     current_user: UserDB = Depends(get_current_user)
 ):
     """ Allow authors and admins to delete comments. """
-    comment = get_comment_by_id(db, comment_id)
+    comment = db.query(CommentDB).filter(CommentDB.id == comment_id).first()
+
     if not comment:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found")
 
-    if comment.author_id != current_user.id and not is_admin(current_user):
+    # Fetch the article to check its author
+    article = db.query(ArticleDB).filter(ArticleDB.id == comment.article_id).first()
+
+    if not article:
+        raise HTTPException(status_code=404, detail="Article not found")
+    if article.author_id != current_user.id and not is_admin(current_user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You can only delete your own comments"

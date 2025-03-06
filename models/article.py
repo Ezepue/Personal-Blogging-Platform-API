@@ -16,7 +16,10 @@ class ArticleDB(Base):
     published_date = Column(DateTime, nullable=True)
     updated_date = Column(DateTime, nullable=True)
 
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    owner = relationship("UserDB", back_populates="articles")
+    author_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    author = relationship("UserDB", back_populates="articles")
+    
+    likes_count = Column(Integer, default=0)
     likes = relationship("LikeDB", back_populates="article", cascade="all, delete-orphan")
     comments = relationship("CommentDB", back_populates="article", cascade="all, delete-orphan")
+    

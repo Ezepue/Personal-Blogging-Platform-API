@@ -24,7 +24,7 @@ class ArticleResponse(BaseModel):
     status: ArticleStatus
     published_date: Optional[datetime] = None
     updated_date: Optional[datetime] = None
-    user_id: int
+    author_id: int
 
     class Config:
         from_attributes = True

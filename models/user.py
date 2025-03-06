@@ -12,6 +12,6 @@ class UserDB(Base):
     hashed_password = Column(String, nullable=False)
     role = Column(Enum(UserRole, native_enum=False), default=UserRole.reader, nullable=False)
 
-    articles = relationship("ArticleDB", back_populates="owner", cascade="all, delete-orphan")
+    articles = relationship("ArticleDB", back_populates="author", cascade="all, delete-orphan")
     likes = relationship("LikeDB", back_populates="user", cascade="all, delete-orphan")
     comments = relationship("CommentDB", back_populates="user", cascade="all, delete-orphan")

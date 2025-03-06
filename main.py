@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Request
 from database import Base, engine
-from routes import users, articles, comments, admin, media
+from routes import users, articles, comments, admin, media, like
 from slowapi.middleware import SlowAPIMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.responses import JSONResponse
@@ -26,9 +26,11 @@ async def startup_event():
 # Register Routers
 app.include_router(users.router, prefix="/users", tags=["Users"])
 app.include_router(articles.router, prefix="/articles", tags=["Articles"])
+app.include_router(like.router, prefix="/like", tags=["Like"])
 app.include_router(comments.router, prefix="/comments", tags=["Comments"])
 app.include_router(admin.router, prefix="/admin", tags=["Admin"])
 app.include_router(media.router, prefix="/media", tags=["Media"])
+
 
 # Custom 404 Error Handler
 @app.exception_handler(404)
