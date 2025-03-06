@@ -56,5 +56,5 @@ def remove_comment(
             detail="You can only delete your own comments"
         )
 
-    delete_comment(db, comment_id)
+    delete_comment(db, comment_id, current_user)
     return {"detail": "Comment deleted successfully"}

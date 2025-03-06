@@ -102,6 +102,10 @@ def delete_user(
 @router.post("/create-super-admin/", response_model=UserResponse)
 def create_super_admin(user_data: UserCreate, db: Session = Depends(get_db)):
     """ Create the first Super Admin if none exists. """
+    
+    existing_user = db.query(UserDB).filter(UserDB.username == user_data.username).first()
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Username already exists")
 
     existing_super_admin = db.query(UserDB).filter(UserDB.role == UserRole.super_admin.value).first()
     if existing_super_admin:

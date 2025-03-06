@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from fastapi import HTTPException
+from sqlalchemy import func
 
 from models.user import UserDB
 from models.article import ArticleDB
@@ -16,6 +17,11 @@ def get_user_by_id(db: Session, user_id: int):
     return db.query(UserDB).filter(UserDB.id == user_id).first()
 
 def create_new_user(db: Session, user_data: UserCreate, role: str = "reader"):
+    """Check if a user with the same username (case-insensitive) already exists"""
+    existing_user = db.query(UserDB).filter(func.lower(UserDB.username) == user_data.username.lower()).first()
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Username already taken")
+    
     """Create a new user with a default or specified role."""
     new_user = UserDB(
         username=user_data.username,
@@ -81,9 +87,13 @@ def update_article(db: Session, article: ArticleDB, article_data: ArticleUpdate)
     db.refresh(article)
     return article
 
-def delete_article(db: Session, article: ArticleDB):
-    """Delete an article from the database."""
-    db.delete(article)
+def delete_article(db: Session, article_id: int):
+    """Delete an article from the database by ID."""
+    article = db.query(ArticleDB).filter(ArticleDB.id == article_id).first()
+    from fastapi import HTTPException
+    if not article:raise HTTPException(status_code=404, detail="Article not found")
+
+    db.delete(article)  # Now deleting the actual ORM instance
     db.commit()
 
 def create_new_comment(db: Session, comment_data: CommentCreate, author_id: int):
@@ -105,11 +115,20 @@ def get_comments_by_article(db: Session, article_id: int, skip: int = 0, limit: 
 def get_comment_by_id(db: Session, comment_id: int):
     """Retrieve a comment by its ID."""
     return db.query(CommentDB).filter(CommentDB.id == comment_id).first()
+    
+def delete_comment(db: Session, comment_id: int, user: UserDB):
+    comment = db.query(CommentDB).filter(CommentDB.id == comment_id).first()
+    if not comment:
+        return False  # Comment not found
 
-def delete_comment(db: Session, comment: CommentDB):
-    """Delete a comment from the database."""
+    # Ensure only the comment author or an admin can delete it
+    if comment.user_id != user.id and user.role != "admin":
+        raise HTTPException(status_code=403, detail="Not authorized to delete this comment")
+
     db.delete(comment)
     db.commit()
+    return True
+
 
 def get_all_users(db: Session, skip: int = 0, limit: int = 10):
     """Retrieve all users with pagination."""

@@ -87,5 +87,5 @@ def remove_comment(
     if not is_admin(current_user):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admins only.")
 
-    delete_comment(db, comment_id)
+    delete_comment(db, comment_id, current_user.id)
     return {"detail": "Comment deleted successfully"}
