@@ -6,10 +6,10 @@ class LikeDB(Base):
     __tablename__ = "likes"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    article_id = Column(Integer, ForeignKey("articles.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    article_id = Column(Integer, ForeignKey("articles.id", ondelete="CASCADE"), nullable=False, index=True)
 
-    # __table_args__ = (UniqueConstraint("user_id", "article_id", name="unique_like"),)
+    __table_args__ = (UniqueConstraint("user_id", "article_id", name="unique_like"),)
 
-    article = relationship("ArticleDB", back_populates="likes")
-    user = relationship("UserDB", back_populates="likes")
+    article = relationship("ArticleDB", back_populates="likes")  # Removed passive_deletes=True
+    user = relationship("UserDB", back_populates="likes")  # Removed passive_deletes=True
