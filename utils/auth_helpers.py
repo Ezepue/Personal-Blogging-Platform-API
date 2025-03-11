@@ -184,7 +184,7 @@ def is_super_admin(user: UserDB):
     """Check if the user is a super admin."""
     logger.info(f"Checking super admin access for user {user.username}, role: {user.role}")
     
-    if not user or user.role != "SUPER_ADMIN":
+    if not user or str(user.role).upper() != "SUPER_ADMIN":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Super admin access required"

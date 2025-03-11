@@ -4,10 +4,11 @@ from enum import Enum
 
 # User roles
 class UserRole(enum.Enum):
-    SUPER_ADMIN = "super_admin"
-    ADMIN = "admin"
-    AUTHOR = "author"
-    READER = "reader"
+    SUPER_ADMIN = "SUPER_ADMIN"
+    ADMIN = "ADMIN"
+    AUTHOR = "AUTHOR"
+    READER = "READER"
+
 
     def __str__(self):
         return self.value
