@@ -24,6 +24,18 @@ def create_article(
     current_user: UserDB = Depends(get_current_user)
 ):
     """ Create a new article. Only authenticated users can post. """
+    # Ensure title and content are valid (Add custom validations if needed)
+    if not article.title or len(article.title) < 5:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="Title must be at least 5 characters long."
+        )
+    if not article.content or len(article.content) < 10:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="Content must be at least 10 characters long."
+        )
+
     new_article = create_new_article(db, article, author_id=current_user.id)
     logger.info(f"User {current_user.id} created article '{new_article.title}' (ID: {new_article.id})")
     return new_article
@@ -41,7 +53,8 @@ def list_articles(
     # Restrict pagination limits
     limit = min(50, max(1, limit))
 
-    articles = get_articles(db, search, category, skip, limit)
+    # Modify the database query to handle search and category filters
+    articles = get_articles(db, search=search, category=category, skip=skip, limit=limit)
     
     logger.info(f"Fetched {len(articles)} articles (Search: '{search}', Category: '{category}').")
     
@@ -73,7 +86,19 @@ def update_existing_article(
     if article.author_id != current_user.id and not is_admin(current_user):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only edit your own articles")
 
-    updated_article = update_article(db, article, article_data)
+    # Ensure title and content are valid (Add custom validations if needed)
+    if not article_data.title or len(article_data.title) < 5:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="Title must be at least 5 characters long."
+        )
+    if not article_data.content or len(article_data.content) < 10:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="Content must be at least 10 characters long."
+        )
+
+    updated_article = update_article(db, article.id, article_data)
     logger.info(f"User {current_user.id} updated article '{article.title}' (ID: {article_id})")
     return updated_article
 

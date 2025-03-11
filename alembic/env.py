@@ -1,22 +1,28 @@
+import os
 from logging.config import fileConfig
 
-from sqlalchemy import create_engine, pool
+from sqlalchemy import engine_from_config, pool
 from alembic import context
-from database import SQLALCHEMY_DATABASE_URL, Base
+
+# Import your database Base and connection URL
+from database import Base, DATABASE_URL
 
 # Alembic Config object
 config = context.config
 
-# Configure logging
-if config.config_file_name:
+# Set the database URL dynamically
+config.set_main_option("sqlalchemy.url", DATABASE_URL)
+
+# Setup logging
+if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Set target metadata for autogenerate support
-target_metadata = Base.metadata
+# Set target metadata (used for autogenerate)
+target_metadata = Base.metadata  # FIXED: Now Alembic detects models
 
 def run_migrations_offline():
     """Run migrations in 'offline' mode."""
-    url = SQLALCHEMY_DATABASE_URL
+    url = config.get_main_option("sqlalchemy.url")
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -27,17 +33,21 @@ def run_migrations_offline():
     with context.begin_transaction():
         context.run_migrations()
 
+
 def run_migrations_online():
     """Run migrations in 'online' mode."""
-    engine = create_engine(SQLALCHEMY_DATABASE_URL, poolclass=pool.NullPool)
-    
-    with engine.connect() as connection:
-        context.configure(
-            connection=connection, target_metadata=target_metadata
-        )
+    connectable = engine_from_config(
+        config.get_section(config.config_ini_section, {}),
+        prefix="sqlalchemy.",
+        poolclass=pool.NullPool,
+    )
+
+    with connectable.connect() as connection:
+        context.configure(connection=connection, target_metadata=target_metadata)
 
         with context.begin_transaction():
             context.run_migrations()
+
 
 if context.is_offline_mode():
     run_migrations_offline()

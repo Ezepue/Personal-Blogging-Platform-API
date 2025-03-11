@@ -69,16 +69,17 @@ def remove_comment(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found")
 
     # Ensure permission for deletion
-    if comment.author_id == current_user.id or is_admin(current_user):
-        delete_comment(db, comment_id)
+    if comment.user_id == current_user.id or is_admin(current_user):
+        delete_comment(db, comment_id, current_user)
         logger.info(f"User {current_user.id} deleted comment {comment_id} on article ID {comment.article_id}")
-        return {"detail": f"Comment {comment_id} deleted successfully"}
+        return {"status": "success", "detail": f"Comment {comment_id} deleted successfully"}
 
     # Fetch article only if needed
     article = get_article_by_id(db, comment.article_id)
     if article and article.author_id == current_user.id:
-        delete_comment(db, comment_id)
+        delete_comment(db, comment_id, current_user)
         logger.info(f"Article author {current_user.id} deleted comment {comment_id} on their article '{article.title}'")
-        return {"detail": f"Comment {comment_id} deleted successfully"}
+        return {"status": "success", "detail": f"Comment {comment_id} deleted successfully"}
 
+    logger.warning(f"User {current_user.id} attempted to delete comment {comment_id} on article ID {comment.article_id} without permission.")
     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You do not have permission to delete this comment")

@@ -14,6 +14,7 @@ from utils.db_helpers import (
     get_articles, get_all_comments, get_article_by_id, get_comment_by_id
 )
 from models.user import UserDB
+from schemas.token import RefreshTokenResponse  # Assuming you have this schema
 
 # Logger setup
 logger = logging.getLogger(__name__)
@@ -48,6 +49,13 @@ def promote_to_admin(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid role. Choose 'admin' or 'super_admin'."
+        )
+
+    # Prevent promoting a super admin to another super admin
+    if new_role == UserRole.SUPER_ADMIN and current_user.id == user_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A super admin cannot promote themselves."
         )
 
     promote_user(db, user_id, new_role)
@@ -101,7 +109,7 @@ def remove_comment_admin(
     db: Session = Depends(get_db),
     current_user: UserDB = Depends(get_current_user)
 ):
-    """Allow only admins and super admins to delete any comment."""
+    """ Allow only admins and super admins to delete any comment. """
     is_admin(current_user)  # Ensures only admins/super admins can delete
 
     comment = get_comment_by_id(db, comment_id)
@@ -112,8 +120,11 @@ def remove_comment_admin(
     logger.info(f"Admin {current_user.id} deleted comment '{comment.content[:30]}...' (ID: {comment_id}).")
     return {"detail": f"Comment '{comment.content[:30]}...' deleted successfully."}
 
-@router.get("/active-sessions", response_model=list[RefreshTokenResponse])
-def get_active_sessions(db: Session = Depends(get_db), current_user = Depends(get_current_user)):
+@router.get("/active-sessions", response_model=List[RefreshTokenResponse])
+def get_active_sessions(
+    db: Session = Depends(get_db), 
+    current_user: UserDB = Depends(get_current_user)
+):
     """ Admins can view active user sessions """
     is_admin(current_user)
 
@@ -121,7 +132,11 @@ def get_active_sessions(db: Session = Depends(get_db), current_user = Depends(ge
     return sessions
 
 @router.delete("/revoke/{token_id}")
-def revoke_token(token_id: int, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
+def revoke_token(
+    token_id: int, 
+    db: Session = Depends(get_db), 
+    current_user: UserDB = Depends(get_current_user)
+):
     """ Admins can revoke user sessions """
     is_admin(current_user)
 
@@ -132,24 +147,3 @@ def revoke_token(token_id: int, db: Session = Depends(get_db), current_user = De
     token.is_active = False
     db.commit()
     return {"detail": "Token revoked successfully"}
-
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
-from database import get_db
-from schemas.admin import ActiveSessionResponse
-from utils.auth_helpers import get_current_user, is_admin
-from utils.db_helpers import get_active_sessions, revoke_session
-from models.user import UserDB
-
-router = APIRouter()
-
-@router.get("/sessions", response_model=list[ActiveSessionResponse])
-def get_active_sessions_route(db: Session = Depends(get_db), current_user: UserDB = Depends(get_current_user)):
-    is_admin(current_user)
-    return get_active_sessions(db)
-
-@router.delete("/sessions/{session_id}")
-def revoke_session_route(session_id: int, db: Session = Depends(get_db), current_user: UserDB = Depends(get_current_user)):
-    is_admin(current_user)
-    revoke_session(db, session_id)
-    return {"detail": "Session revoked successfully"}

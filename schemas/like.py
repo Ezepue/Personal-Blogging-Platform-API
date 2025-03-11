@@ -1,8 +1,11 @@
 from pydantic import BaseModel, Field, ConfigDict
+from typing import Optional
 
 class LikeResponse(BaseModel):
-    user_id: int = Field(gt=0)  # User ID must be positive
-    article_id: int = Field(gt=0)  # Article ID must be positive
-    likes_count: int = Field(ge=0)  # Likes cannot be negative
+    message: str
+    user_id: int = Field(..., gt=0, description="User who liked the article")  
+    article_id: int = Field(..., gt=0, description="Liked article ID")
+    user_id: Optional[int] = None  # Make it optional
+    likes_count: int
 
-    model_config = ConfigDict(from_attributes=True)  # Corrected ConfigDict usage
+    model_config = ConfigDict(from_attributes=True) 

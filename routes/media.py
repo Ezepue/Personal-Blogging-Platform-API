@@ -1,5 +1,7 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException, Query
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
+from utils.auth_helpers import get_current_user
+from models.user import UserDB
+
 import shutil
 import os
 import logging
@@ -38,35 +40,41 @@ def validate_file_size(file: UploadFile):
     """Ensure the uploaded file is within the allowed size limit."""
     file.file.seek(0, os.SEEK_END)
     file_size = file.file.tell()
-    file.file.seek(0)  # Reset file pointer for reading
+    file.file.seek(0)
 
     max_size_bytes = MAX_FILE_SIZE_MB * 1024 * 1024
     if file_size > max_size_bytes:
         raise HTTPException(status_code=413, detail=f"File size exceeds {MAX_FILE_SIZE_MB}MB limit")
 
+def validate_and_sanitize_filename(filename: str) -> Path:
+    """Sanitize and return a safe file path."""
+    # Prevent directory traversal attack (../)
+    safe_filename = Path(filename).name
+    return UPLOAD_DIR / safe_filename
+
 @router.post("/upload/")
-async def upload_file(file: UploadFile = File(...)):
-    """Handles media file uploads securely with size validation."""
+async def upload_file(
+    file: UploadFile = File(...),
+    current_user: UserDB = Depends(get_current_user)  # Requires authentication
+):
+    """Handles secure media file uploads (Authenticated Users Only)."""
     ensure_upload_dir()
-
-    # Validate file size before processing
     validate_file_size(file)
-
-    # Securely get the filename
+    
     filename = get_unique_filename(file.filename)
     file_location = UPLOAD_DIR / filename
 
     try:
-        # Save the file in chunks to prevent memory overload
         with file_location.open("wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
         
-        logger.info(f"File uploaded successfully: {filename}")
+        logger.info(f"User {current_user.id} uploaded file: {file_location}")
     except Exception as e:
         logger.error(f"File upload failed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"File upload failed: {str(e)}")
 
     return {"filename": filename, "url": f"/media/{filename}"}
+
 
 @router.get("/files/")
 def list_files():
@@ -80,37 +88,37 @@ def list_files():
         logger.error(f"Could not list files: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Could not list files: {str(e)}")
 
-@router.get("/media/{filename}")
-def get_file(filename: str):
-    """Serve uploaded files securely."""
+@router.get("/files/")
+def list_files(current_user: UserDB = Depends(get_current_user)):
+    """Returns a list of uploaded files (Authenticated Users Only)."""
     ensure_upload_dir()
+    
+    try:
+        files = [file.name for file in UPLOAD_DIR.iterdir() if file.is_file()]
+        logger.info(f"User {current_user.id} listed files")
+        return {"files": files}
+    except Exception as e:
+        logger.error(f"Could not list files: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Could not list files: {str(e)}")
 
-    # Prevent directory traversal attack (../)
-    safe_filename = Path(filename).name
-    file_path = UPLOAD_DIR / safe_filename
-
-    if not file_path.exists() or not file_path.is_file():
-        logger.warning(f"File not found: {filename}")
-        raise HTTPException(status_code=404, detail="File not found")
-
-    return FileResponse(file_path)
 
 @router.delete("/delete/{filename}")
-def delete_file(filename: str):
-    """Delete an uploaded file."""
+def delete_file(
+    filename: str,
+    current_user: UserDB = Depends(get_current_user)  # Requires authentication
+):
+    """Delete an uploaded file (Authenticated Users Only)."""
     ensure_upload_dir()
 
-    # Prevent directory traversal attack (../)
-    safe_filename = Path(filename).name
-    file_path = UPLOAD_DIR / safe_filename
+    file_path = validate_and_sanitize_filename(filename)
 
     if not file_path.exists() or not file_path.is_file():
-        logger.warning(f"Attempted to delete non-existent file: {filename}")
+        logger.warning(f"User {current_user.id} attempted to delete non-existent file: {file_path}")
         raise HTTPException(status_code=404, detail="File not found")
 
     try:
-        file_path.unlink()  # Delete the file
-        logger.info(f"File deleted successfully: {filename}")
+        file_path.unlink()
+        logger.info(f"User {current_user.id} deleted file: {file_path}")
         return {"detail": f"File {filename} deleted successfully"}
     except Exception as e:
         logger.error(f"Failed to delete file {filename}: {str(e)}")

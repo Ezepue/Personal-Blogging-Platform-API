@@ -1,93 +1,132 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy import update
+from sqlalchemy import update, func
 from models.article import ArticleDB
 from models.like import LikeDB
 from database import get_db
 from schemas.like import LikeResponse
 from utils.auth_helpers import get_current_user
+from utils.db_helpers import get_article_with_likes
 from models.user import UserDB
 import logging
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
+
 
 @router.post("/{article_id}", response_model=LikeResponse)
 def like_article(
-    article_id: int, 
-    db: Session = Depends(get_db), 
+    article_id: int,
+    db: Session = Depends(get_db),
     user: UserDB = Depends(get_current_user)
 ):
     """Like an article (if not already liked)."""
+    logger.info(f"User {user.id} attempting to like article {article_id}")
 
-    article = db.query(ArticleDB).filter(ArticleDB.id == article_id).one_or_none()
+    article = db.query(ArticleDB).filter(ArticleDB.id == article_id).first()
     if not article:
+        logger.warning(f"Article {article_id} not found")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Article not found")
 
     existing_like = db.query(LikeDB).filter(
-        LikeDB.article_id == article_id, 
+        LikeDB.article_id == article_id,
         LikeDB.user_id == user.id
-    ).one_or_none()
-    
+    ).first()
+
     if existing_like:
+        logger.info(f"User {user.id} already liked article {article_id}")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You already liked this article")
 
-    # Add new like
-    new_like = LikeDB(article_id=article_id, user_id=user.id)
-
     try:
+        # Insert like
+        new_like = LikeDB(article_id=article_id, user_id=user.id)
         db.add(new_like)
-        db.execute(update(ArticleDB).where(ArticleDB.id == article_id).values(likes_count=ArticleDB.likes_count + 1))
         db.commit()
-        db.refresh(article)  # Refresh to get updated like count
+
+        # Update likes_count using COUNT(*)
+        likes_count = db.query(func.count(LikeDB.id)).filter(LikeDB.article_id == article_id).scalar()
+        db.query(ArticleDB).filter(ArticleDB.id == article_id).update({"likes_count": likes_count})
+        db.commit()
+
+        logger.info(f"User {user.id} liked article {article_id}, new count: {likes_count}")
 
     except SQLAlchemyError as e:
         db.rollback()
-        logger.error(f"Like processing error: {str(e)}")
+        logger.error(f"Error processing like for article {article_id}: {str(e)}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error processing like")
 
-    return LikeResponse(article_id=article.id, likes_count=article.likes_count, user_id=user.id)
-
+    return LikeResponse(
+        message="Successfully liked the article.",
+        user_id=user.id,
+        article_id=article.id,
+        likes_count=likes_count
+    )
 
 @router.delete("/{article_id}", response_model=LikeResponse)
 def unlike_article(
-    article_id: int, 
-    db: Session = Depends(get_db), 
+    article_id: int,
+    db: Session = Depends(get_db),
     user: UserDB = Depends(get_current_user)
 ):
     """Unlike an article (if previously liked)."""
+    logger.info(f"User {user.id} is trying to unlike article {article_id}")
+
+    article = db.query(ArticleDB).filter(ArticleDB.id == article_id).first()
+    if not article:
+        logger.warning(f"Article {article_id} not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Article not found")
 
     like = db.query(LikeDB).filter(
-        LikeDB.article_id == article_id, 
+        LikeDB.article_id == article_id,
         LikeDB.user_id == user.id
     ).one_or_none()
 
     if not like:
+        logger.info(f"User {user.id} has not liked article {article_id}")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You have not liked this article")
 
     try:
+        # ✅ Delete the like
         db.delete(like)
-        db.execute(update(ArticleDB).where(ArticleDB.id == article_id).values(likes_count=ArticleDB.likes_count - 1))
         db.commit()
 
-        # Get the updated like count
-        updated_likes = db.query(ArticleDB.likes_count).filter(ArticleDB.id == article_id).scalar()
+        # ✅ Update likes_count using COUNT(*)
+        likes_count = db.query(func.count(LikeDB.id)).filter(LikeDB.article_id == article_id).scalar()
+        db.query(ArticleDB).filter(ArticleDB.id == article_id).update({"likes_count": likes_count})
+        db.commit()
+
+        logger.info(f"User {user.id} unliked article {article_id}, new count: {likes_count}")
 
     except SQLAlchemyError as e:
         db.rollback()
         logger.error(f"Unlike processing error: {str(e)}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error processing unlike")
 
-    return LikeResponse(article_id=article_id, likes_count=updated_likes, user_id=user.id)
+    return LikeResponse(
+        message="Successfully unliked the article.",
+        user_id=user.id,
+        article_id=article.id,
+        likes_count=likes_count
+    )
 
 
 @router.get("/{article_id}/count", response_model=LikeResponse)
 def get_like_count(article_id: int, db: Session = Depends(get_db)):
     """Get the like count for an article."""
+    logger.info(f"Fetching like count for article {article_id}")
 
     likes_count = db.query(ArticleDB.likes_count).filter(ArticleDB.id == article_id).scalar()
     if likes_count is None:
+        logger.warning(f"Article {article_id} not found when fetching like count")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Article not found")
 
-    return LikeResponse(article_id=article_id, likes_count=likes_count)
+    logger.info(f"Article {article_id} has {likes_count} likes")
+    
+    return LikeResponse(
+        message="Like count retrieved successfully.",
+        article_id=article_id,
+        likes_count=likes_count,
+        user_id=None  # Optional, since we're only fetching the count
+    )
