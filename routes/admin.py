@@ -7,11 +7,13 @@ from database import get_db
 from schemas.article import ArticleResponse
 from schemas.comment import CommentResponse
 from models.enums import UserRole
-from schemas.user import UserResponse
+from models.refresh_token import RefreshTokenDB
+from schemas.user import UserResponse, PromoteUserRequest
 from utils.auth_helpers import get_current_user, is_admin, is_super_admin
 from utils.db_helpers import (
     get_all_users, promote_user, delete_article, delete_comment, 
-    get_articles, get_all_comments, get_article_by_id, get_comment_by_id
+    get_articles, get_all_comments, get_article_by_id, get_comment_by_id,
+    get_user_by_id, update_user_role
 )
 from models.user import UserDB
 from schemas.token import RefreshTokenResponse  # Assuming you have this schema
@@ -61,6 +63,42 @@ def promote_to_admin(
     promote_user(db, user_id, new_role)
     logger.info(f"Super Admin {current_user.id} promoted User {user_id} to {new_role.name}.")
     return {"detail": f"User {user_id} promoted to {new_role.name} successfully."}
+
+@router.put("/{user_id}/role")
+def change_user_role(
+    user_id: int, 
+    request: PromoteUserRequest,  
+    db: Session = Depends(get_db), 
+    current_user: UserDB = Depends(get_current_user)
+):
+    """Allow only Super Admins to change user roles."""
+    if not is_super_admin(current_user):
+        raise HTTPException(status_code=403, detail="Only Super Admins can perform this action.")
+
+    db_user = get_user_by_id(db, user_id)
+    if not db_user:
+        logger.error(f"User with id {user_id} not found")
+        raise HTTPException(status_code=404, detail="User not found")
+
+    role_str = request.new_role.value.upper()  # Ensure correct case handling
+    if role_str not in UserRole.__members__:
+        logger.error(f"Invalid role: {role_str}")
+        raise HTTPException(status_code=400, detail="Invalid role")
+
+    # Prevent Super Admin demotion & self-promotion
+    if db_user.role == UserRole.SUPER_ADMIN and role_str != "SUPER_ADMIN":
+        logger.warning(f"Attempted to demote super admin {db_user.username}")
+        raise HTTPException(status_code=403, detail="Super Admins cannot be demoted")
+
+    if db_user.id == current_user.id and role_str != "SUPER_ADMIN":
+        logger.warning(f"User {current_user.username} attempted to change their own role")
+        raise HTTPException(status_code=403, detail="You cannot change your own role")
+
+    updated_user = update_user_role(db, current_user, user_id, role_str)
+
+    logger.info(f"User {updated_user.username} role updated to {updated_user.role.value}")
+    return {"detail": f"User {updated_user.username} role updated to {updated_user.role.value}"}
+
 
 @router.get("/articles", response_model=List[ArticleResponse])
 def list_all_articles(
@@ -128,7 +166,7 @@ def get_active_sessions(
     """ Admins can view active user sessions """
     is_admin(current_user)
 
-    sessions = db.query(RefreshToken).filter(RefreshToken.is_active == True).all()
+    sessions = db.query(RefreshTokenDB).filter(RefreshTokenDB.is_active == True).all()
     return sessions
 
 @router.delete("/revoke/{token_id}")
@@ -140,7 +178,7 @@ def revoke_token(
     """ Admins can revoke user sessions """
     is_admin(current_user)
 
-    token = db.query(RefreshToken).filter_by(id=token_id).first()
+    token = db.query(RefreshTokenDB).filter_by(id=token_id).first()
     if not token:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Token not found")
 

@@ -16,7 +16,6 @@ class UserCreate(BaseModel):
         }
 
 class PromoteUserRequest(BaseModel):
-    user_id: int = Field(..., gt=0)  # User ID must be positive
     new_role: UserRole = Field(..., description="Valid roles: reader, admin, super_admin")
 
     class Config:

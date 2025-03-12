@@ -12,6 +12,7 @@ from pydantic import SecretStr
 
 from models.user import UserDB
 from models.refresh_token import RefreshTokenDB
+from models.enums import UserRole
 from database import get_db
 from config import SECRET_KEY, ALGORITHM
 
@@ -171,26 +172,34 @@ def delete_expired_tokens(db: Session):
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
 
 # Role-based Access Control
+
 def is_admin(user: UserDB):
     """Check if the user is an admin."""
-    if user.role not in ["admin", "super_admin"]:
+    logger.info(f"Checking admin access for user {user.username}, role: {user.role}")
+
+    if user.role not in {UserRole.ADMIN, UserRole.SUPER_ADMIN}:  # Use Enum
+        logger.warning(f"Access denied: User {user.username} (role: {user.role}) is not an admin.")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, 
             detail="Admin access required"
         )
+
+    logger.info(f"User {user.username} granted admin access.")
     return True
 
 def is_super_admin(user: UserDB):
     """Check if the user is a super admin."""
     logger.info(f"Checking super admin access for user {user.username}, role: {user.role}")
-    
-    if not user or str(user.role).upper() != "SUPER_ADMIN":
+
+    if user.role != UserRole.SUPER_ADMIN:  # Use Enum comparison
+        logger.warning(f"Access denied: User {user.username} (role: {user.role}) is not a super admin.")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Super admin access required"
         )
-    return True
 
+    logger.info(f"User {user.username} granted super admin access.")
+    return True
 
 # Logging Configuration (to be called in main.py or the entry point)
 logging.basicConfig(level=logging.INFO)

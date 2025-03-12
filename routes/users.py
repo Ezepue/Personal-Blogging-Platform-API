@@ -74,40 +74,6 @@ def login(
         "token_type": "bearer"
     }
 
-@router.put("/{user_id}/role")
-def change_user_role(
-    user_id: int, 
-    new_role: dict,
-    db: Session = Depends(get_db), 
-    current_user: UserDB = Depends(get_current_user)
-):
-    """Allow only Super Admins to change user roles."""
-    if not is_super_admin(current_user):
-        raise HTTPException(status_code=403, detail="Only Super Admins can perform this action.")
-
-    db_user = get_user_by_id(db, user_id)
-    if not db_user:
-        logger.error(f"User with id {user_id} not found")
-        raise HTTPException(status_code=404, detail="User not found")
-
-    role_str = new_role.get("role", "").upper()
-    if role_str not in UserRole.__members__:
-        logger.error(f"Invalid role: {role_str}")
-        raise HTTPException(status_code=400, detail="Invalid role")
-
-    # Prevent Super Admin demotion & self-promotion
-    if db_user.role == UserRole.SUPER_ADMIN and role_str != "SUPER_ADMIN":
-        logger.warning(f"Attempted to demote super admin {db_user.username}")
-        raise HTTPException(status_code=403, detail="Super Admins cannot be demoted")
-
-    if db_user.id == current_user.id and role_str != "SUPER_ADMIN":
-        logger.warning(f"User {current_user.username} attempted to change their own role")
-        raise HTTPException(status_code=403, detail="You cannot change your own role")
-
-    updated_user = update_user_role(db, user_id, UserRole[role_str])
-    logger.info(f"User {updated_user.username} role updated to {updated_user.role.value}")
-    return {"detail": f"User {updated_user.username} role updated to {updated_user.role.value}"}
-
 @router.post("/refresh")
 def refresh_access_token(refresh_token: str, db: Session = Depends(get_db)):
     """Refresh access token using a valid refresh token."""

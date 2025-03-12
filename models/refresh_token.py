@@ -11,6 +11,7 @@ class RefreshTokenDB(Base):
     token = Column(String, unique=True, nullable=False)
     expires_at = Column(DateTime, nullable=False, index=True)
     revoked = Column(Boolean, default=False, nullable=False, index=True)
+    is_active = Column(Boolean, default=True)
 
     # Composite index for faster querying of active tokens
     __table_args__ = (
