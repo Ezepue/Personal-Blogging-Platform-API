@@ -9,7 +9,7 @@ from models.enums import UserRole
 from schemas.user import UserCreate
 from schemas.article import ArticleCreate, ArticleUpdate
 from schemas.comment import CommentCreate
-from typing import List 
+from typing import List
 from utils.auth_helpers import hash_password
 
 # Logger Setup (Fixed Order)
@@ -55,19 +55,19 @@ def update_user_role(db: Session, current_user: UserDB, user_id: int, new_role: 
     """Update the role of an existing user."""
     if current_user.id == user_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You cannot change your own role")
-    
+
     user = get_user_by_id(db, user_id)
-    
+
     if user.role == UserRole.SUPER_ADMIN:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Super Admins cannot be downgraded")
-    
+
     if user.role == UserRole[new_role]:  # Convert string to Enum
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User already has this role")
-    
+
     user.role = UserRole[new_role]
     db.commit()
     db.refresh(user)
-    
+
     logger.info(f"User {user.username} role updated to {new_role}")
     return user
 
@@ -75,7 +75,7 @@ def promote_user(db: Session, user_id: int, new_role: str):
     """Promote a user to a higher role (e.g., admin, super_admin)."""
     try:
         user = db.query(UserDB).filter(UserDB.id == user_id).first()
-        
+
         if not user:
             logger.warning(f"User with ID {user_id} not found.")
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
@@ -94,19 +94,23 @@ def promote_user(db: Session, user_id: int, new_role: str):
         logger.error(f"Error promoting user: {e}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
 
+from models.enums import ArticleStatus
+
 def delete_user_from_db(db: Session, user_id: int):
     """Soft delete user and their articles/comments instead of hard deleting."""
     user = get_user_by_id(db, user_id)
-    
-    user.is_active = False 
+    if not user:
+        return
+
+    user.is_active = False
     db.query(ArticleDB).filter(ArticleDB.author_id == user_id).update(
-        {"status": "deleted"}, synchronize_session=False
+        {ArticleDB.status: ArticleStatus.DELETED}, synchronize_session=False
     )
 
     db.query(CommentDB).filter(CommentDB.user_id == user_id).update(
-        {"is_deleted": True}, synchronize_session=False
-    )
-    
+        {CommentDB.is_deleted: True }, synchronize_session=False
+        )
+
     db.commit()
     logger.info(f"User {user.username} and associated content soft deleted.")
 
@@ -115,7 +119,7 @@ def get_all_users(db: Session) -> List[UserDB]:
     """Fetch all users from the database."""
     try:
         users = db.query(UserDB).all()
-        
+
         if not users:
             logger.warning("No users found in the database")
             raise HTTPException(
@@ -131,7 +135,7 @@ def get_all_users(db: Session) -> List[UserDB]:
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error"
         )
-        
+
 
 
 
@@ -194,7 +198,7 @@ def get_article_by_id(db: Session, article_id: int) -> ArticleDB:
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error"
         )
-        
+
 def update_article(db: Session, article_id: int, article_data: ArticleUpdate) -> ArticleDB:
     """Update an article by ID."""
     try:
@@ -235,12 +239,12 @@ def delete_article(db: Session, article_id: int):
     article = db.query(ArticleDB).filter(ArticleDB.id == article_id).first()
     if not article:
         raise HTTPException(status_code=404, detail="Article not found")
-    
+
     db.query(CommentDB).filter(CommentDB.article_id == article_id).delete(synchronize_session=False)
     db.delete(article)
     db.commit()
     logger.info(f"Article '{article.title}' deleted.")
-    
+
 def get_article_with_likes(db: Session, article_id: int):
     """Fetch article and ensure it exists."""
     article = db.query(ArticleDB).filter(ArticleDB.id == article_id).first()
@@ -267,7 +271,7 @@ def get_comments_by_article(db: Session, article_id: int, skip: int = 0, limit: 
     """Retrieve all comments for a given article."""
     try:
         comments = db.query(CommentDB).filter(CommentDB.article_id == article_id).all()
-        
+
         if not comments:
             logger.warning(f"No comments found for article ID {article_id}")
             raise HTTPException(
@@ -283,12 +287,12 @@ def get_comments_by_article(db: Session, article_id: int, skip: int = 0, limit: 
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error"
         )
-        
+
 def get_comment_by_id(db: Session, comment_id: int) -> CommentDB:
     """Fetch a single comment by its ID."""
     try:
         comment = db.query(CommentDB).filter(CommentDB.id == comment_id).first()
-        
+
         if not comment:
             logger.warning(f"Comment with ID {comment_id} not found")
             raise HTTPException(
@@ -318,14 +322,14 @@ def delete_comment(db: Session, comment_id: int, user: UserDB, allow_admin: bool
         db.commit()
         logger.info(f"Comment {comment_id} deleted by user {user.id}.")
         return {"message": "Comment deleted successfully"}
-    
+
     raise HTTPException(status_code=403, detail="Not authorized to delete this comment")
-      
+
 def get_all_comments(db: Session):
     """Retrieve all comments from the database."""
     try:
         comments = db.query(CommentDB).all()
-        
+
         if not comments:
             logger.info("No comments found in the database.")
             raise HTTPException(

@@ -10,10 +10,14 @@ class WebSocketManager:
         """Accept the WebSocket connection and store it."""
         await websocket.accept()
         self.active_connections[user_id] = websocket
-
+        
     def disconnect(self, user_id: int):
-        """Disconnect the WebSocket for the given user_id."""
+        """Properly close WebSocket before disconnecting."""
         if user_id in self.active_connections:
+            try:
+                self.active_connections[user_id].close()
+            except Exception as e:
+                print(f"Error closing WebSocket for user {user_id}: {e}")
             del self.active_connections[user_id]
 
     async def send_message(self, user_id: int, message: str):

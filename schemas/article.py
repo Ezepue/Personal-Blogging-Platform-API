@@ -21,7 +21,7 @@ class ArticleResponse(BaseModel):
     id: int
     title: str
     content: str
-    tags: List[str] = Field(default_factory=list) 
+    tags: List[str] = Field(default_factory=list)
     category: Optional[str] = None
     status: ArticleStatus
     published_date: Optional[datetime] = None

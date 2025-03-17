@@ -29,7 +29,7 @@ def get_unique_filename(filename: str) -> str:
         raise HTTPException(status_code=400, detail="Filename cannot be empty")
 
     extension = Path(filename).suffix.lower()
-    
+
     # Ensure the file type is allowed
     if extension not in ALLOWED_EXTENSIONS:
         raise HTTPException(status_code=400, detail="Unsupported file type")
@@ -60,14 +60,14 @@ async def upload_file(
     """Handles secure media file uploads (Authenticated Users Only)."""
     ensure_upload_dir()
     validate_file_size(file)
-    
+
     filename = get_unique_filename(file.filename)
     file_location = UPLOAD_DIR / filename
 
     try:
         with file_location.open("wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
-        
+
         logger.info(f"User {current_user.id} uploaded file: {file_location}")
     except Exception as e:
         logger.error(f"File upload failed: {str(e)}")
@@ -92,7 +92,7 @@ def list_files():
 def list_files(current_user: UserDB = Depends(get_current_user)):
     """Returns a list of uploaded files (Authenticated Users Only)."""
     ensure_upload_dir()
-    
+
     try:
         files = [file.name for file in UPLOAD_DIR.iterdir() if file.is_file()]
         logger.info(f"User {current_user.id} listed files")

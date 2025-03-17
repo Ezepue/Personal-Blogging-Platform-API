@@ -4,22 +4,25 @@ from typing import List, Optional
 import logging
 
 from database import get_db
+from models.article import ArticleDB
 from schemas.article import ArticleCreate, ArticleUpdate, ArticleResponse
 from utils.auth_helpers import get_current_user, is_admin
 from utils.db_helpers import (
-    create_new_article, get_article_by_id, 
+    create_new_article, get_article_by_id,
     update_article, delete_article, get_articles
 )
 from models.user import UserDB
 
 # Logger setup
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+
 @router.post("/", response_model=ArticleResponse)
 def create_article(
-    article: ArticleCreate, 
+    article: ArticleCreate,
     db: Session = Depends(get_db),
     current_user: UserDB = Depends(get_current_user)
 ):
@@ -27,12 +30,12 @@ def create_article(
     # Ensure title and content are valid (Add custom validations if needed)
     if not article.title or len(article.title) < 5:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, 
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail="Title must be at least 5 characters long."
         )
     if not article.content or len(article.content) < 10:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, 
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail="Content must be at least 10 characters long."
         )
 
@@ -42,22 +45,22 @@ def create_article(
 
 @router.get("/", response_model=List[ArticleResponse])
 def list_articles(
-    db: Session = Depends(get_db), 
-    search: Optional[str] = None, 
+    db: Session = Depends(get_db),
+    search: Optional[str] = None,
     category: Optional[str] = None,
-    skip: int = 0, 
+    skip: int = 0,
     limit: int = 10
 ):
     """ Fetch all articles with optional search and category filters. """
-    
+
     # Restrict pagination limits
     limit = min(50, max(1, limit))
 
     # Modify the database query to handle search and category filters
     articles = get_articles(db, search=search, category=category, skip=skip, limit=limit)
-    
+
     logger.info(f"Fetched {len(articles)} articles (Search: '{search}', Category: '{category}').")
-    
+
     return articles or []
 
 @router.get("/{article_id}", response_model=ArticleResponse)
@@ -66,7 +69,7 @@ def read_article(article_id: int, db: Session = Depends(get_db)):
     article = get_article_by_id(db, article_id)
     if not article:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Article not found")
-    
+
     logger.info(f"Article '{article.title}' (ID: {article_id}) retrieved.")
     return article
 
@@ -89,12 +92,12 @@ def update_existing_article(
     # Ensure title and content are valid (Add custom validations if needed)
     if not article_data.title or len(article_data.title) < 5:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, 
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail="Title must be at least 5 characters long."
         )
     if not article_data.content or len(article_data.content) < 10:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, 
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail="Content must be at least 10 characters long."
         )
 
@@ -120,3 +123,15 @@ def delete_existing_article(
     delete_article(db, article_id)
     logger.info(f"User {current_user.id} deleted article '{article.title}' (ID: {article_id})")
     return {"detail": f"Article '{article.title}' deleted successfully"}
+
+# Share
+@router.get("/articles/{id}/share")
+def share_article(id: int, db: Session = Depends(get_db)):
+    article = db.query(ArticleDB).filter(ArticleDB.id == id).first()
+    if not article:
+        logger.warning(f"Article with ID {id} not found.")
+        raise HTTPException(status_code=404, detail="Article not found")
+
+    share_url = f"http://127.0.0.1:8000/articles/{id}"
+    logger.info(f"Generated share URL for article {id}: {share_url}")
+    return {"share_url": share_url}

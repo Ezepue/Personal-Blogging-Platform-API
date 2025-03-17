@@ -1,7 +1,7 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
 from sqlalchemy.orm import Session
 from models.notification import NotificationDB
-from utils.notification_helper import fetch_unread_notifications, send_notification_to_user
+from utils.notification_helper import fetch_unread_notifications
 from websocket_manager import websocket_manager
 from database import get_db
 from utils.auth_helpers import get_current_user
@@ -13,8 +13,6 @@ from utils.auth_helpers import verify_access_token
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-
-
 
 
 @router.websocket("/ws/{user_id}")
@@ -52,13 +50,16 @@ def get_unread_notifications(
     return fetch_unread_notifications(db, current_user.id, skip, limit)
 
 # Function to send a notification to a user via WebSocket
-async def send_notification_to_user(user_id: int, notification_data: dict):
-    """Send a real-time notification to the user."""
-    websocket = websocket_manager.get(user_id)
-    if websocket:
-        await websocket.send_json(notification_data)
-    else:
-        # If the user is offline, store the notification in the database
-        new_notification = NotificationDB(user_id=user_id, **notification_data)
-        db.add(new_notification)
-        db.commit()
+async def send_notification_to_user(user_id: int, message: str):
+    """Send a notification and store it in DB"""
+    db = next(get_db())
+    new_notification = NotificationDB(user_id=user_id, message=message, is_read=False)
+    db.add(new_notification)
+    db.commit()
+    db.refresh(new_notification)
+
+    if user_id in websocket_manager.active_connections:
+        await websocket_manager.active_connections[user_id].send_json({"message": message})
+
+    return new_notification
+

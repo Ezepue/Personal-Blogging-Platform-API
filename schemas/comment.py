@@ -14,4 +14,4 @@ class CommentResponse(BaseModel):
     created_date: datetime = Field(..., description="Timestamp when the comment was created")
     updated_date: Optional[datetime] = Field(None, description="Timestamp when the comment was last updated")
 
-    model_config = ConfigDict(from_attributes=True) 
+    model_config = ConfigDict(from_attributes=True)

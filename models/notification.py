@@ -11,7 +11,6 @@ class NotificationDB(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     message = Column(String, nullable=False)
     is_read = Column(Boolean, default=False, index=True)
-    message = Column(String, nullable=False)
     extra_data = Column(JSON, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
 

@@ -23,7 +23,7 @@ def add_comment(
     current_user: UserDB = Depends(get_current_user)
 ):
     """ Allow authenticated users to comment on articles. """
-    
+
     # Ensure the article exists
     article = get_article_by_id(db, comment.article_id)
     if not article:
@@ -31,7 +31,7 @@ def add_comment(
 
     new_comment = create_new_comment(db, comment, author_id=current_user.id)
     logger.info(f"User {current_user.id} commented on article '{article.title}' (ID: {comment.article_id})")
-    
+
     return new_comment
 
 @router.get("/{article_id}", response_model=List[CommentResponse])
@@ -42,10 +42,10 @@ def list_comments(
     limit: int = 10
 ):
     """ Retrieve comments for a specific article with pagination. """
-    
+
     # Ensure valid pagination values
     limit = min(50, max(1, limit))  # Limit max results to 50
-    
+
     # Ensure the article exists
     article = get_article_by_id(db, article_id)
     if not article:
@@ -63,7 +63,7 @@ def remove_comment(
     current_user: UserDB = Depends(get_current_user)
 ):
     """Allow authors of the article, comment owners, and admins to delete comments."""
-    
+
     comment = get_comment_by_id(db, comment_id)
     if not comment:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found")

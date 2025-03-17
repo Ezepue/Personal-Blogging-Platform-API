@@ -28,7 +28,7 @@ class UserRole(enum.Enum):
             return cls(role_str)
         except ValueError:
             raise ValueError(f"Invalid role: {role_str}. Choose from {list(cls.to_dict().keys())}")
-        
+
 class NotificationType(str, Enum):
     LIKE = "like"
     COMMENT = "comment"

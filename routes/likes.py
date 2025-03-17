@@ -123,7 +123,7 @@ def get_like_count(article_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Article not found")
 
     logger.info(f"Article {article_id} has {likes_count} likes")
-    
+
     return LikeResponse(
         message="Like count retrieved successfully.",
         article_id=article_id,

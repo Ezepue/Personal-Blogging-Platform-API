@@ -12,7 +12,7 @@ class ArticleDB(Base):
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String, nullable=False, index=True)
     content = Column(Text, nullable=False)
-    tags = Column(JSONB, nullable=False, default=lambda: [])  
+    tags = Column(JSONB, nullable=False, default=lambda: [])
     category = Column(String, nullable=True)
 
     status = Column(Enum(ArticleStatus, native_enum=True), default=ArticleStatus.DRAFT, nullable=False)
@@ -24,5 +24,5 @@ class ArticleDB(Base):
 
     likes = relationship("LikeDB", back_populates="article", cascade="all, delete-orphan", passive_deletes=True)
     comments = relationship("CommentDB", back_populates="article", cascade="all, delete-orphan", passive_deletes=True)
-    
+
     likes_count = Column(Integer, default=0, nullable=False)

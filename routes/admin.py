@@ -11,9 +11,9 @@ from models.refresh_token import RefreshTokenDB
 from schemas.user import UserResponse, PromoteUserRequest
 from utils.auth_helpers import get_current_user, is_admin, is_super_admin
 from utils.db_helpers import (
-    get_all_users, promote_user, delete_article, delete_comment, 
+    get_all_users, promote_user, delete_article, delete_comment,
     get_articles, get_all_comments, get_article_by_id, get_comment_by_id,
-    get_user_by_id, update_user_role
+    get_user_by_id, update_user_role, delete_user_from_db
 )
 from models.user import UserDB
 from schemas.token import RefreshTokenResponse  # Assuming you have this schema
@@ -66,9 +66,9 @@ def promote_to_admin(
 
 @router.put("/{user_id}/role")
 def change_user_role(
-    user_id: int, 
-    request: PromoteUserRequest,  
-    db: Session = Depends(get_db), 
+    user_id: int,
+    request: PromoteUserRequest,
+    db: Session = Depends(get_db),
     current_user: UserDB = Depends(get_current_user)
 ):
     """Allow only Super Admins to change user roles."""
@@ -160,7 +160,7 @@ def remove_comment_admin(
 
 @router.get("/active-sessions", response_model=List[RefreshTokenResponse])
 def get_active_sessions(
-    db: Session = Depends(get_db), 
+    db: Session = Depends(get_db),
     current_user: UserDB = Depends(get_current_user)
 ):
     """ Admins can view active user sessions """
@@ -171,8 +171,8 @@ def get_active_sessions(
 
 @router.delete("/revoke/{token_id}")
 def revoke_token(
-    token_id: int, 
-    db: Session = Depends(get_db), 
+    token_id: int,
+    db: Session = Depends(get_db),
     current_user: UserDB = Depends(get_current_user)
 ):
     """ Admins can revoke user sessions """
@@ -183,5 +183,27 @@ def revoke_token(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Token not found")
 
     token.is_active = False
+    token.revoked = True
     db.commit()
     return {"detail": "Token revoked successfully"}
+
+@router.delete("/{user_id}")
+def delete_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user)
+):
+    """Allow only Super Admins to delete users."""
+    if not is_super_admin(current_user):
+        logger.warning(f"User {current_user.username} attempted to delete a user without proper permissions.")
+        raise HTTPException(status_code=403, detail="Only Super Admins can perform this action.")
+
+    db_user = get_user_by_id(db, user_id)
+    if not db_user:
+        logger.error(f"User with id {user_id} not found")
+        raise HTTPException(status_code=404, detail="User not found")
+
+    delete_user_from_db(db, user_id)
+    logger.info(f"User {db_user.username} deleted successfully")
+    return {"detail": f"User {db_user.username} deleted successfully"}
+

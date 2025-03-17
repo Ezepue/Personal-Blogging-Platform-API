@@ -2,7 +2,7 @@ import logging
 from fastapi import FastAPI, Request
 from database import Base, engine
 from models import *  # Ensure all models are imported before creating tables
-from routes import likes, users, articles, comments, admin, media, notifications, health
+from routes import likes, users, articles, comments, admin, media, notifications
 from slowapi.middleware import SlowAPIMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.middleware.cors import CORSMiddleware
@@ -52,7 +52,7 @@ def startup_event():
 @app.on_event("shutdown")
 def shutdown_event():
     """Handles any cleanup or closing operations during shutdown."""
-    logger.info("Shutting down server...") 
+    logger.info("Shutting down server...")
 
 # --- Register Routers ---
 app.include_router(users.router, prefix="/users", tags=["Users"])

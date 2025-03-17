@@ -9,7 +9,7 @@ class TokenResponse(BaseModel):
 
     class Config:
         # Add description for better API documentation
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "access_token": "example.access.token",
                 "refresh_token": "example.refresh.token",
@@ -20,16 +20,14 @@ class TokenResponse(BaseModel):
 class RefreshTokenResponse(BaseModel):
     id: int
     user_id: int
-    device_info: Optional[str] = None 
+    device_info: Optional[str] = None
     created_at: datetime
     expires_at: datetime
-    is_active: bool 
+    is_active: bool
 
     class Config:
-        from_attributes = True 
-
-    class Config:
-        schema_extra = {
+        from_attributes = True
+        json_schema_extra = {
             "example": {
                 "id": 1,
                 "user_id": 101,

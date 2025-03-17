@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, Text, DateTime, ForeignKey, func
+from sqlalchemy import Column, Integer, Text, DateTime, ForeignKey, func, Boolean
 from sqlalchemy.orm import relationship
 from database import Base
 
@@ -7,9 +7,10 @@ class CommentDB(Base):
     __tablename__ = "comments"
 
     id = Column(Integer, primary_key=True, index=True)
-    content = Column(Text, nullable=False) 
+    content = Column(Text, nullable=False)
     created_date = Column(DateTime, default=func.now(), nullable=False)
-    updated_date = Column(DateTime, onupdate=func.now(), nullable=True)  # Fixed update behavior
+    updated_date = Column(DateTime, onupdate=func.now(), nullable=True)
+    is_deleted = Column(Boolean, default=False, nullable=False)
 
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     article_id = Column(Integer, ForeignKey("articles.id", ondelete="CASCADE"), nullable=False, index=True)

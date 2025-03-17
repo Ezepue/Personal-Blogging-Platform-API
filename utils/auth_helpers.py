@@ -48,7 +48,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     to_encode = data.copy()
     expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
     to_encode.update({"exp": expire, "token_type": "access"})
-    
+
     encoded_token = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     logger.info(f"Generated access token for user {data['sub']} with expiration {expire}")
     return encoded_token
@@ -102,7 +102,7 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     )
     if not token:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Token required")
-    
+
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id = payload.get("sub")
@@ -116,7 +116,7 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     except JWTError as e:
         logger.warning(f"JWT decoding failed: {e}")
         raise credentials_exception
-    
+
     logger.info(f"User {user.username} authenticated successfully")
     return user
 
@@ -138,6 +138,7 @@ def revoke_refresh_token(token: str, db: Session):
             logger.info(f"Refresh token {token} already revoked")
             return
         db_token.revoked = True
+        db_token.is_active = False
         db.commit()
         logger.info(f"Revoked refresh token {token} for user {db_token.user_id}")
     except Exception as e:
@@ -153,6 +154,9 @@ def refresh_access_token(db: Session, refresh_token: str) -> str:
     if db_token.revoked:
         logger.info(f"Revoked token attempted: {refresh_token}")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token revoked")
+    if not db_token.is_active:
+        logger.info(f"Inactive token attempted: {refresh_token}")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token is inactive")
     if db_token.expires_at < datetime.utcnow():
         logger.info(f"Expired refresh token: {refresh_token}")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token expired")
@@ -161,10 +165,7 @@ def refresh_access_token(db: Session, refresh_token: str) -> str:
 # Delete Expired Tokens
 def delete_expired_tokens(db: Session):
     try:
-        expired_tokens = db.query(RefreshTokenDB).filter(RefreshTokenDB.expires_at < datetime.utcnow()).all()
-        count = len(expired_tokens)
-        for token in expired_tokens:
-            db.delete(token)
+        count = db.query(RefreshTokenDB).filter(RefreshTokenDB.expires_at < datetime.utcnow()).delete(synchronize_session=False)
         db.commit()
         logger.info(f"Deleted {count} expired tokens from the database")
     except Exception as e:
@@ -172,7 +173,6 @@ def delete_expired_tokens(db: Session):
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
 
 # Role-based Access Control
-
 def is_admin(user: UserDB):
     """Check if the user is an admin."""
     logger.info(f"Checking admin access for user {user.username}, role: {user.role}")
@@ -180,7 +180,7 @@ def is_admin(user: UserDB):
     if user.role not in {UserRole.ADMIN, UserRole.SUPER_ADMIN}:  # Use Enum
         logger.warning(f"Access denied: User {user.username} (role: {user.role}) is not an admin.")
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, 
+            status_code=status.HTTP_403_FORBIDDEN,
             detail="Admin access required"
         )
 

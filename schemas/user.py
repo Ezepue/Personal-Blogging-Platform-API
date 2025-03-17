@@ -7,7 +7,7 @@ class UserCreate(BaseModel):
     password: SecretStr = Field(..., min_length=8, description="Password must be at least 8 characters long and strong.")
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "username": "john_doe",
                 "email": "john.doe@example.com",
@@ -19,7 +19,7 @@ class PromoteUserRequest(BaseModel):
     new_role: UserRole = Field(..., description="Valid roles: reader, admin, super_admin")
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "user_id": 101,
                 "new_role": "admin"
@@ -34,7 +34,7 @@ class UserResponse(BaseModel):
 
     class Config:
         from_attributes = True
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "id": 101,
                 "username": "john_doe",

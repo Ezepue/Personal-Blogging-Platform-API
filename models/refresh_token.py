@@ -9,6 +9,7 @@ class RefreshTokenDB(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     token = Column(String, unique=True, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
     expires_at = Column(DateTime, nullable=False, index=True)
     revoked = Column(Boolean, default=False, nullable=False, index=True)
     is_active = Column(Boolean, default=True)
@@ -21,8 +22,8 @@ class RefreshTokenDB(Base):
     user = relationship("UserDB", back_populates="refresh_tokens", passive_deletes=True, lazy="joined")
 
     def is_valid(self) -> bool:
-        """Check if the token is still valid and not revoked."""
-        return not self.revoked and datetime.utcnow() < self.expires_at
+        """Check if the token is still valid, not revoked, and active."""
+        return self.is_active and not self.revoked and datetime.utcnow() < self.expires_at
 
     @staticmethod
     def generate_expiration(days: int = 30) -> datetime:

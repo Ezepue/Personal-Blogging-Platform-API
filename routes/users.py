@@ -5,20 +5,17 @@ from fastapi.security import OAuth2PasswordRequestForm
 from datetime import timedelta
 
 from slowapi import Limiter
-from slowapi.util import get_remote_address 
+from slowapi.util import get_remote_address
 
 from database import get_db
 from schemas.user import UserCreate, UserResponse
 from utils.auth_helpers import (
     create_access_token, get_current_user, hash_password,
-    verify_user_credentials, is_super_admin, create_refresh_token,
-    revoke_refresh_token, verify_refresh_token
+    verify_user_credentials, create_refresh_token, verify_refresh_token
 )
-from utils.db_helpers import (
-    create_new_user, get_user_by_id, update_user_role, delete_user_from_db
-)
+from utils.db_helpers import create_new_user
 from models.user import UserDB, UserRole
-from models.refresh_token import RefreshTokenDB  
+from models.refresh_token import RefreshTokenDB
 from config import ACCESS_TOKEN_EXPIRE_MINUTES, REFRESH_TOKEN_EXPIRE_DAYS
 
 logger = logging.getLogger(__name__)
@@ -38,19 +35,19 @@ def register_user(user: UserCreate, db: Session = Depends(get_db)):
     # new_user = create_new_user(db, user.username, user.email, hashed_pw)
     new_user = create_new_user(db, user, role=UserRole.READER)
 
-    
+
     logger.info(f"New user registered: {new_user.username} ({new_user.email})")
     return new_user
 
 @router.post("/login")
 @limiter.limit("3/minute")
 def login(
-    request: Request,  
+    request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
 ):
     """Authenticate user and return JWT access and refresh tokens."""
-    
+
     user = verify_user_credentials(db, form_data.username, form_data.password)
     if user is None:
         logger.warning(f"Failed login attempt for username: {form_data.username}")
@@ -86,37 +83,25 @@ def refresh_access_token(refresh_token: str, db: Session = Depends(get_db)):
     logger.info(f"Access token refreshed for user {user_id}")
     return {"access_token": new_access_token, "token_type": "bearer"}
 
-@router.post("/logout")
-def logout_user(db: Session = Depends(get_db), current_user: UserDB = Depends(get_current_user)):
-    """Logout by deactivating refresh tokens."""
-    # Ensure the refresh tokens exist for the current user
-    refresh_tokens = db.query(RefreshTokenDB).filter_by(user_id=current_user.id, is_active=True).all()
-    
-    if not refresh_tokens:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No active refresh tokens found")
-    
-    # Deactivate the refresh tokens
-    db.query(RefreshTokenDB).filter_by(user_id=current_user.id).update({"is_active": False})
-    db.commit()
-    
-    return {"detail": "Logged out successfully"}
-
-@router.delete("/{user_id}")
-def delete_user(
-    user_id: int, 
+@router.post("/logout", status_code=status.HTTP_200_OK)
+def logout_user(
     db: Session = Depends(get_db), 
-    current_user: UserDB = Depends(get_current_user)  
+    current_user: UserDB = Depends(get_current_user)
 ):
-    """Allow only Super Admins to delete users."""
-    if not is_super_admin(current_user):
-        logger.warning(f"User {current_user.username} attempted to delete a user without proper permissions.")
-        raise HTTPException(status_code=403, detail="Only Super Admins can perform this action.")
+    """Logout by deactivating refresh tokens."""
+    try:
+        # Fetch active refresh tokens
+        refresh_tokens = db.query(RefreshTokenDB).filter_by(user_id=current_user.id, is_active=True).all()
 
-    db_user = get_user_by_id(db, user_id)
-    if not db_user:
-        logger.error(f"User with id {user_id} not found")
-        raise HTTPException(status_code=404, detail="User not found")
+        if not refresh_tokens:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No active refresh tokens found")
 
-    delete_user_from_db(db, user_id)
-    logger.info(f"User {db_user.username} deleted successfully")
-    return {"detail": f"User {db_user.username} deleted successfully"}
+        # Mark refresh tokens as inactive
+        db.query(RefreshTokenDB).filter_by(user_id=current_user.id, is_active=True).update({"is_active": False})
+        db.commit()
+
+        return {"detail": "Logged out successfully"}
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Logout failed: {str(e)}")
