@@ -3,28 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Home - Blog</title>
+    <title>Notifications</title>
     <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
     <header>
-        <h1>My Blog</h1>
+        <h1>Notifications</h1>
         <nav>
             <a href="index.html">Home</a>
             <a href="create_post.html">Create Post</a>
             <a href="login.html" id="loginLink">Login</a>
             <a href="register.html" id="registerLink">Register</a>
-            <button id="logoutBtn" style="display: none;" onclick="logout()">Logout</button>
+            <button id="logoutBtn" style="display: none;">Logout</button>
         </nav>
     </header>
 
-    <main>
-        <section id="posts-container">
-            <h2>Latest Posts</h2>
-            <div id="posts" aria-live="polite"></div>
-        </section>
+    <main id="notifications-container">
+        <h2>Your Notifications</h2>
+        <button id="clear-notifications-btn">Clear All</button>
+        <ul id="notifications-list" aria-live="polite">
+            <li>No new notifications.</li>
+        </ul>
     </main>
 
-    <script src="assets/js/main.js"></script>
+    <script src="assets/js/notifications.js"></script>
 </body>
 </html>

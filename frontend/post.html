@@ -1,28 +1,77 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Blog Post</title>
-    <link rel="stylesheet" href="styles/main.css">
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Post</title>
+	<link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
-    <header>
-        <h1>Blog Post Title</h1>
-    </header>
+	<header>
+		<h1>Blog Post</h1>
+		<nav>
+			<a href="index.html">Home</a>
+			<a href="create_post.html">Create Post</a>
+			<a href="login.html" id="loginLink">Login</a>
+			<a href="register.html" id="registerLink">Register</a>
+			<button id="logoutBtn" style="display: none;">Logout</button>
+		</nav>
+		<div id="search-container">
+			<input type="text" id="search-input" placeholder="Search posts..." aria-label="Search posts">
+			<button id="search-btn">Search</button>
+		
+			<select id="filter-category">
+				<option value="">All Categories</option>
+				<option value="Technology">Technology</option>
+				<option value="Health">Health</option>
+				<option value="Education">Education</option>
+			</select>
+		</div>
+	</header>
 
-    <main>
-        <article>
-            <p>Full content of the blog post goes here...</p>
-        </article>
+	<main id="post-container">
+		<h2 id="post-title"></h2>
+		<p id="post-author"></p>
+		<p id="post-content"></p>
 
-        <section id="comments">
-            <h3>Comments</h3>
-            <textarea id="comment-input" placeholder="Write a comment..."></textarea>
-            <button onclick="postComment()">Post</button>
-        </section>
-    </main>
+		<!-- Edit & Delete Buttons (Only for the post author) -->
+		<div id="post-actions" style="display: none;">
+			<button id="edit-post-btn">Edit</button>
+			<button id="delete-post-btn">Delete</button>
+		</div>
 
-    <script src="scripts/main.js"></script>
+		<!-- Comments Section -->
+		<section id="comments-section">
+			<h3>Comments</h3>
+			<div id="comments-container" aria-live="polite"></div>
+
+			<form id="comment-form">
+				<label for="comment-text">Add a Comment:</label>
+				<textarea id="comment-text" placeholder="Write a comment..." required></textarea>
+				<button type="submit">Add Comment</button>
+			</form>
+		</section>
+
+		<!-- Likes Section -->
+		<div id="likes-section">
+			<button id="like-btn">Like</button>
+			<span id="like-count">0</span> Likes
+		</div>
+
+		<!-- Share Section -->
+		<div id="share-section">
+			<button id="share-btn">Share</button>
+			<span id="share-message"></span>
+		</div>
+		
+		<div class="share-container">
+			<button id="copyLinkBtn">Copy Link</button>
+			<a id="whatsappShare" href="#" target="_blank" aria-label="Share on WhatsApp">WhatsApp</a>
+			<a id="twitterShare" href="#" target="_blank" aria-label="Share on Twitter">Twitter</a>
+			<a id="facebookShare" href="#" target="_blank" aria-label="Share on Facebook">Facebook</a>
+		</div>
+	</main>
+
+	<script src="assets/js/post.js"></script>
 </body>
 </html>

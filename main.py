@@ -31,7 +31,7 @@ app.add_middleware(SlowAPIMiddleware)
 # Optional: Enable CORS if frontend needs access
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "https://yourfrontend.com"],
+    allow_origins=["http://localhost:3000", "http://localhost:5500/", "*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

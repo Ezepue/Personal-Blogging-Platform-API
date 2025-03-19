@@ -4,25 +4,71 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Panel</title>
-    <link rel="stylesheet" href="styles/main.css">
+    <link rel="stylesheet" href="assets/css/admin.css">
 </head>
 <body>
     <header>
-        <h1>Admin Panel</h1>
+        <h1>Admin Dashboard</h1>
+        <nav>
+            <a href="index.html">Home</a>
+            <button id="logoutBtn">Logout</button>
+        </nav>
     </header>
 
     <main>
-        <section>
-            <h2>Manage Users</h2>
-            <ul id="user-list"></ul>
-        </section>
-
+        <!-- Manage Posts Section -->
         <section>
             <h2>Manage Posts</h2>
-            <ul id="post-list"></ul>
+            <table id="postsTable">
+                <thead>
+                    <tr>
+                        <th scope="col">Title</th>
+                        <th scope="col">Author</th>
+                        <th scope="col">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td colspan="3">No posts available.</td></tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- Manage Users Section -->
+        <section>
+            <h2>Manage Users</h2>
+            <table id="usersTable">
+                <thead>
+                    <tr>
+                        <th scope="col">Username</th>
+                        <th scope="col">Email</th>
+                        <th scope="col">Role</th>
+                        <th scope="col">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td colspan="4">No users available.</td></tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- Reported Comments Section -->
+        <section>
+            <h2>Reported Comments</h2>
+            <table id="reportedCommentsTable">
+                <thead>
+                    <tr>
+                        <th scope="col">Comment</th>
+                        <th scope="col">Author</th>
+                        <th scope="col">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td colspan="3">No reported comments.</td></tr>
+                </tbody>
+            </table>
         </section>
     </main>
 
-    <script src="scripts/admin.js"></script>
+    <script src="assets/js/admin.js"></script>
 </body>
 </html>

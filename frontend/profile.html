@@ -3,21 +3,60 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>User Profile</title>
-    <link rel="stylesheet" href="styles/main.css">
+    <title>Profile</title>
+    <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
     <header>
-        <h1>User Profile</h1>
+        <h1>Profile</h1>
+        <nav>
+            <a href="index.html">Home</a>
+            <a href="create_post.html">Create Post</a>
+            <button id="logoutBtn">Logout</button>
+        </nav>
     </header>
 
     <main>
-        <h2>Username</h2>
-        <p>Bio: Web developer and writer.</p>
-        <h3>My Posts</h3>
-        <ul>
-            <li><a href="post.html">My First Blog Post</a></li>
-        </ul>
+        <section class="profile-info">
+            <h2>User Profile</h2>
+            <p><strong>Username:</strong> <span id="username"></span></p>
+            <p><strong>Email:</strong> <span id="email"></span></p>
+            <p><strong>Role:</strong> <span id="role"></span></p>
+
+            <h3>Update Profile</h3>
+            <form id="updateProfileForm">
+                <label for="newUsername">New Username:</label>
+                <input type="text" id="newUsername" placeholder="Enter new username">
+
+                <label for="newEmail">New Email:</label>
+                <input type="email" id="newEmail" placeholder="Enter new email">
+
+                <button type="submit">Update Profile</button>
+            </form>
+
+            <h3>Change Password</h3>
+            <form id="changePasswordForm">
+                <label for="currentPassword">Current Password:</label>
+                <input type="password" id="currentPassword" required placeholder="Enter current password">
+
+                <label for="newPassword">New Password:</label>
+                <input type="password" id="newPassword" required placeholder="Enter new password">
+
+                <button type="submit">Change Password</button>
+            </form>
+
+            <h3 class="danger-zone">Danger Zone</h3>
+            <button id="deleteAccountBtn" class="delete-btn">Delete Account</button>
+        </section>
+
+        <section class="user-posts">
+            <h2>Your Posts</h2>
+            <ul id="userPostsList">
+                <li>No posts available.</li> <!-- Placeholder for empty posts -->
+            </ul>
+        </section>
     </main>
+
+    <script src="assets/js/profile.js"></script>
 </body>
 </html>

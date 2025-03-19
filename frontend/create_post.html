@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Post</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+    <header>
+        <h1>Create a New Post</h1>
+        <nav>
+            <a href="index.html">Home</a>
+            <a href="create_post.html">Create Post</a>
+            <a href="login.html" id="loginLink">Login</a>
+            <a href="register.html" id="registerLink">Register</a>
+            <button id="logoutBtn" style="display: none;">Logout</button>
+        </nav>
+    </header>
+
+    <main>
+        <section>
+            <h2>New Blog Post</h2>
+            <form id="create-post-form">
+                <label for="title">Title:</label>
+                <input type="text" id="title" required>
+
+                <label for="content">Content:</label>
+                <textarea id="content" rows="6" required></textarea>
+
+                <button type="submit">Publish</button>
+            </form>
+            <p id="message"></p>
+        </section>
+    </main>
+
+    <script src="assets/js/create_post.js"></script>
+</body>
+</html>

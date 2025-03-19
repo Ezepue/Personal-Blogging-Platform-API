@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.post("/", response_model=ArticleResponse)
+@router.post("", response_model=ArticleResponse)
 def create_article(
     article: ArticleCreate,
     db: Session = Depends(get_db),
@@ -43,7 +43,7 @@ def create_article(
     logger.info(f"User {current_user.id} created article '{new_article.title}' (ID: {new_article.id})")
     return new_article
 
-@router.get("/", response_model=List[ArticleResponse])
+@router.get("", response_model=List[ArticleResponse])
 def list_articles(
     db: Session = Depends(get_db),
     search: Optional[str] = None,
