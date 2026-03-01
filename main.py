@@ -37,17 +37,20 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         return response
 
 # --- Middleware Setup ---
-app.add_middleware(TrustedHostMiddleware, allowed_hosts=["yourdomain.com", "127.0.0.1"])
-app.add_middleware(SlowAPIMiddleware)
-app.add_middleware(SecurityHeadersMiddleware)
-
-# Optional: Enable CORS if frontend needs access
+# Starlette applies middleware in LIFO order — last registered is outermost (first to execute).
+# Execution order: TrustedHostMiddleware → SlowAPIMiddleware → SecurityHeadersMiddleware → CORSMiddleware → route
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[FRONTEND_URL],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+)
+app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(SlowAPIMiddleware)
+app.add_middleware(
+    TrustedHostMiddleware,
+    allowed_hosts=["yourdomain.com", "127.0.0.1"]
 )
 
 # --- Database Initialization ---

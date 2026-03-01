@@ -31,7 +31,6 @@ def register_user(request: Request, user: UserCreate, db: Session = Depends(get_
         logger.warning(f"Registration attempt with existing email: {user.email}")
         raise HTTPException(status_code=400, detail="Email already registered")
 
-    hashed_pw = hash_password(user.password)
     new_user = create_new_user(db, user, role=UserRole.READER)
 
     logger.info(f"New user registered: {new_user.username} ({new_user.email})")
