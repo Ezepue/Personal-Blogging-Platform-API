@@ -115,6 +115,17 @@ def delete_user_from_db(db: Session, user_id: int):
     logger.info(f"User {user.username} and associated content soft deleted.")
 
 
+def get_user_by_username(db: Session, username: str):
+    return db.query(UserDB).filter(UserDB.username == username).first()
+
+def update_user_profile(db: Session, user: UserDB, data: dict) -> UserDB:
+    for key, value in data.items():
+        if value is not None:
+            setattr(user, key, value)
+    db.commit()
+    db.refresh(user)
+    return user
+
 def get_all_users(db: Session) -> List[UserDB]:
     """Fetch all users from the database."""
     try:

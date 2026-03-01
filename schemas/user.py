@@ -1,4 +1,5 @@
-from pydantic import BaseModel, SecretStr, EmailStr, Field, ConfigDict
+from typing import Optional
+from pydantic import BaseModel, SecretStr, EmailStr, Field, ConfigDict, field_validator
 from models.enums import UserRole
 
 class UserCreate(BaseModel):
@@ -42,3 +43,34 @@ class UserResponse(BaseModel):
                 "role": "reader"
             }
         }
+
+class UserProfileUpdate(BaseModel):
+    username: Optional[str] = None
+    email: Optional[str] = None
+    bio: Optional[str] = None
+
+    @field_validator("username")
+    @classmethod
+    def validate_username(cls, v):
+        if v is not None and len(v) < 3:
+            raise ValueError("Username must be at least 3 characters")
+        return v
+
+class UserPasswordChange(BaseModel):
+    current_password: str
+    new_password: str
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_new_password(cls, v):
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters")
+        return v
+
+class UserPublicProfile(BaseModel):
+    id: int
+    username: str
+    bio: Optional[str] = None
+    avatar_url: Optional[str] = None
+    role: str
+    model_config = ConfigDict(from_attributes=True)
