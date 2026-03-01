@@ -77,7 +77,7 @@ async def upload_file(
 
 
 @router.get("/files/")
-def list_files():
+def list_files(current_user: UserDB = Depends(get_current_user)):
     """Returns a list of uploaded files."""
     ensure_upload_dir()
 
