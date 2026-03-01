@@ -9,6 +9,7 @@ from utils.auth_helpers import get_current_user, is_admin
 from utils.db_helpers import (
     create_new_comment, get_comments_by_article, get_comment_by_id, delete_comment, get_article_by_id
 )
+from utils.notification_helper import send_notification_to_user
 from models.user import UserDB
 
 # Logger setup
@@ -17,7 +18,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 @router.post("/", response_model=CommentResponse)
-def add_comment(
+async def add_comment(
     comment: CommentCreate,
     db: Session = Depends(get_db),
     current_user: UserDB = Depends(get_current_user)
@@ -31,6 +32,13 @@ def add_comment(
 
     new_comment = create_new_comment(db, comment, author_id=current_user.id)
     logger.info(f"User {current_user.id} commented on article '{article.title}' (ID: {comment.article_id})")
+
+    if article.author_id != current_user.id:
+        await send_notification_to_user(
+            db=db,
+            user_id=article.author_id,
+            message=f"{current_user.username} commented on \"{article.title}\"",
+        )
 
     return new_comment
 

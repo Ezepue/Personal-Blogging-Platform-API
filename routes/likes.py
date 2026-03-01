@@ -8,6 +8,7 @@ from database import get_db
 from schemas.like import LikeResponse
 from utils.auth_helpers import get_current_user
 from utils.db_helpers import get_article_with_likes
+from utils.notification_helper import send_notification_to_user
 from models.user import UserDB
 import logging
 
@@ -17,7 +18,7 @@ logging.basicConfig(level=logging.INFO)
 
 
 @router.post("/{article_id}", response_model=LikeResponse)
-def like_article(
+async def like_article(
     article_id: int,
     db: Session = Depends(get_db),
     user: UserDB = Depends(get_current_user)
@@ -51,6 +52,13 @@ def like_article(
         db.commit()
 
         logger.info(f"User {user.id} liked article {article_id}, new count: {likes_count}")
+
+        if article.author_id != user.id:
+            await send_notification_to_user(
+                db=db,
+                user_id=article.author_id,
+                message=f"{user.username} liked your article \"{article.title}\"",
+            )
 
     except SQLAlchemyError as e:
         db.rollback()

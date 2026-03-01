@@ -63,3 +63,47 @@ async def send_notification_to_user(user_id: int, message: str):
 
     return new_notification
 
+@router.post("/read/{notification_id}")
+async def mark_read(
+    notification_id: int,
+    current_user: UserDB = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    notif = db.query(NotificationDB).filter(
+        NotificationDB.id == notification_id,
+        NotificationDB.user_id == current_user.id,
+    ).first()
+    if not notif:
+        raise HTTPException(status_code=404, detail="Notification not found")
+    notif.is_read = True
+    db.commit()
+    return {"message": "Marked as read"}
+
+@router.post("/read-all")
+async def mark_all_read(
+    current_user: UserDB = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    db.query(NotificationDB).filter(
+        NotificationDB.user_id == current_user.id,
+        NotificationDB.is_read == False,
+    ).update({"is_read": True})
+    db.commit()
+    return {"message": "All notifications marked as read"}
+
+@router.delete("/{notification_id}")
+async def delete_notification(
+    notification_id: int,
+    current_user: UserDB = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    notif = db.query(NotificationDB).filter(
+        NotificationDB.id == notification_id,
+        NotificationDB.user_id == current_user.id,
+    ).first()
+    if not notif:
+        raise HTTPException(status_code=404, detail="Notification not found")
+    db.delete(notif)
+    db.commit()
+    return {"message": "Deleted"}
+
