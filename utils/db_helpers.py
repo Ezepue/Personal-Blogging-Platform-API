@@ -317,7 +317,7 @@ def delete_comment(db: Session, comment_id: int, user: UserDB, allow_admin: bool
         raise HTTPException(status_code=404, detail="Comment not found")
 
     # Check if user has permission to delete
-    if comment.user_id == user.id or (allow_admin and user.role in {UserRole.admin, UserRole.super_admin}):
+    if comment.user_id == user.id or (allow_admin and user.role in {UserRole.ADMIN, UserRole.SUPER_ADMIN}):
         db.delete(comment)
         db.commit()
         logger.info(f"Comment {comment_id} deleted by user {user.id}.")

@@ -4,6 +4,7 @@ from typing import List, Optional
 import logging
 
 from database import get_db
+from config import FRONTEND_URL
 from models.article import ArticleDB
 from schemas.article import ArticleCreate, ArticleUpdate, ArticleResponse
 from utils.auth_helpers import get_current_user, is_admin
@@ -132,6 +133,6 @@ def share_article(id: int, db: Session = Depends(get_db)):
         logger.warning(f"Article with ID {id} not found.")
         raise HTTPException(status_code=404, detail="Article not found")
 
-    share_url = f"http://127.0.0.1:8000/articles/{id}"
+    share_url = f"{FRONTEND_URL}/posts/{id}"
     logger.info(f"Generated share URL for article {id}: {share_url}")
     return {"share_url": share_url}

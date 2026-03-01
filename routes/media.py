@@ -88,20 +88,6 @@ def list_files():
         logger.error(f"Could not list files: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Could not list files: {str(e)}")
 
-@router.get("/files/")
-def list_files(current_user: UserDB = Depends(get_current_user)):
-    """Returns a list of uploaded files (Authenticated Users Only)."""
-    ensure_upload_dir()
-
-    try:
-        files = [file.name for file in UPLOAD_DIR.iterdir() if file.is_file()]
-        logger.info(f"User {current_user.id} listed files")
-        return {"files": files}
-    except Exception as e:
-        logger.error(f"Could not list files: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Could not list files: {str(e)}")
-
-
 @router.delete("/delete/{filename}")
 def delete_file(
     filename: str,

@@ -43,6 +43,7 @@ ALGORITHM = "HS256"
 
 # Upload Configuration
 UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", os.path.abspath("uploads"))
+FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
 try:
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
     logger.info(f"Upload folder set to: {UPLOAD_FOLDER}")
