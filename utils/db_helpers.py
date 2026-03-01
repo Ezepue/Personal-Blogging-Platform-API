@@ -119,8 +119,9 @@ def get_user_by_username(db: Session, username: str):
     return db.query(UserDB).filter(UserDB.username == username).first()
 
 def update_user_profile(db: Session, user: UserDB, data: dict) -> UserDB:
+    ALLOWED_FIELDS = {"username", "email", "bio"}
     for key, value in data.items():
-        if value is not None:
+        if key in ALLOWED_FIELDS and value is not None:
             setattr(user, key, value)
     db.commit()
     db.refresh(user)

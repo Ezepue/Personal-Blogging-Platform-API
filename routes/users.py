@@ -118,6 +118,10 @@ async def update_my_profile(
         existing = get_user_by_username(db, data.username)
         if existing:
             raise HTTPException(status_code=409, detail="Username already taken")
+    if data.email and data.email != current_user.email:
+        existing_email = db.query(UserDB).filter(UserDB.email == data.email).first()
+        if existing_email:
+            raise HTTPException(status_code=409, detail="Email already in use")
     updated = update_user_profile(db, current_user, data.model_dump(exclude_none=True))
     return updated
 
@@ -142,10 +146,17 @@ async def upload_avatar(
     allowed = {"image/jpeg", "image/png", "image/webp", "image/gif"}
     if file.content_type not in allowed:
         raise HTTPException(status_code=400, detail="Only image files are allowed for avatars")
-    filename = f"avatar_{current_user.id}_{file.filename}"
+    safe_name = os.path.basename(file.filename or "upload")
+    filename = f"avatar_{current_user.id}_{safe_name}"
     path = os.path.join(UPLOAD_FOLDER, filename)
+    if not os.path.abspath(path).startswith(os.path.abspath(UPLOAD_FOLDER)):
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    MAX_AVATAR_SIZE = 10 * 1024 * 1024  # 10MB
+    contents = await file.read()
+    if len(contents) > MAX_AVATAR_SIZE:
+        raise HTTPException(status_code=413, detail="File too large. Maximum size is 10MB.")
     with open(path, "wb") as f:
-        f.write(await file.read())
+        f.write(contents)
     avatar_url = f"/media/{filename}"
     current_user.avatar_url = avatar_url
     db.commit()
