@@ -1,5 +1,6 @@
 import os
 import logging
+import warnings
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
@@ -50,4 +51,10 @@ try:
 except Exception as e:
     logger.error(f"Error creating upload folder at {UPLOAD_FOLDER}: {e}")
     raise
+
+if len(SECRET_KEY) < 32:
+    warnings.warn(
+        "SECRET_KEY is shorter than 32 characters. Use a strong random key in production.",
+        stacklevel=2,
+    )
 

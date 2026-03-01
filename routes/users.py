@@ -23,7 +23,8 @@ router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
 
 @router.post("/register", response_model=UserResponse)
-def register_user(user: UserCreate, db: Session = Depends(get_db)):
+@limiter.limit("5/hour")
+def register_user(request: Request, user: UserCreate, db: Session = Depends(get_db)):
     """Register a new user."""
     existing_user = db.query(UserDB).filter(UserDB.email == user.email).first()
     if existing_user:
