@@ -17,7 +17,7 @@ export default function WritePage() {
   const [content, setContent] = useState("");
   const [tags, setTags] = useState("");
   const [category, setCategory] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [savingAction, setSavingAction] = useState<"draft" | "publish" | null>(null);
   const [error, setError] = useState("");
   const [initialized, setInitialized] = useState(false);
 
@@ -57,7 +57,7 @@ export default function WritePage() {
       setError("Title and content are required");
       return;
     }
-    setSaving(true);
+    setSavingAction(publish ? "publish" : "draft");
     setError("");
     try {
       const res = await fetch("/api/articles/", {
@@ -82,7 +82,7 @@ export default function WritePage() {
         setError((err as { detail?: string }).detail ?? "Failed to save");
       }
     } finally {
-      setSaving(false);
+      setSavingAction(null);
     }
   };
 
@@ -124,17 +124,17 @@ export default function WritePage() {
       <div className="flex gap-3 mt-6">
         <button
           onClick={() => submit(false)}
-          disabled={saving}
+          disabled={savingAction !== null}
           className="px-5 py-2.5 border border-border rounded-lg text-muted hover:text-[#f1f1f5] hover:border-[#f1f1f5] transition-colors disabled:opacity-50"
         >
-          {saving ? "Saving…" : "Save Draft"}
+          {savingAction === "draft" ? "Saving…" : "Save Draft"}
         </button>
         <button
           onClick={() => submit(true)}
-          disabled={saving}
+          disabled={savingAction !== null}
           className="px-5 py-2.5 bg-accent hover:bg-accent-hover text-white rounded-lg font-medium transition-colors disabled:opacity-50"
         >
-          {saving ? "Publishing…" : "Publish"}
+          {savingAction === "publish" ? "Publishing…" : "Publish"}
         </button>
       </div>
     </div>

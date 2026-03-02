@@ -39,13 +39,11 @@ export default function Editor({ content, onChange }: EditorProps) {
         const data = await res.json();
         editor?.chain().focus().setImage({ src: `/api/media/${data.filename}` }).run();
       } else {
-        alert("Image upload failed. Please try again.");
+        console.error("Image upload failed:", res.status);
       }
-    } catch {
-      alert("Image upload failed. Please check your connection.");
+    } catch (err) {
+      console.error("Image upload error:", err);
     }
-    // Reset file input so same file can be re-uploaded
-    if (fileRef.current) fileRef.current.value = "";
   };
 
   if (!editor) return null;
@@ -92,6 +90,7 @@ export default function Editor({ content, onChange }: EditorProps) {
           onChange={(e) => {
             const file = e.target.files?.[0];
             if (file) uploadImage(file);
+            e.target.value = ""; // reset so same file can be re-uploaded
           }}
         />
       </div>
