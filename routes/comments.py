@@ -33,12 +33,15 @@ async def add_comment(
     new_comment = create_new_comment(db, comment, author_id=current_user.id)
     logger.info(f"User {current_user.id} commented on article '{article.title}' (ID: {comment.article_id})")
 
-    if article.author_id != current_user.id:
-        await send_notification_to_user(
-            db=db,
-            user_id=article.author_id,
-            message=f"{current_user.username} commented on \"{article.title}\"",
-        )
+    try:
+        if article.author_id != current_user.id:
+            await send_notification_to_user(
+                db=db,
+                user_id=article.author_id,
+                message=f"{current_user.username} commented on \"{article.title}\"",
+            )
+    except Exception:
+        pass  # notification failure must not fail the comment operation
 
     return new_comment
 

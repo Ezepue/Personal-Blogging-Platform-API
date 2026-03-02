@@ -49,20 +49,6 @@ def get_unread_notifications(
     """Fetch unread notifications for the current user."""
     return fetch_unread_notifications(db, current_user.id, skip, limit)
 
-# Function to send a notification to a user via WebSocket
-async def send_notification_to_user(user_id: int, message: str):
-    """Send a notification and store it in DB"""
-    db = next(get_db())
-    new_notification = NotificationDB(user_id=user_id, message=message, is_read=False)
-    db.add(new_notification)
-    db.commit()
-    db.refresh(new_notification)
-
-    if user_id in websocket_manager.active_connections:
-        await websocket_manager.active_connections[user_id].send_json({"message": message})
-
-    return new_notification
-
 @router.post("/read/{notification_id}")
 async def mark_read(
     notification_id: int,

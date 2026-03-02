@@ -53,17 +53,21 @@ async def like_article(
 
         logger.info(f"User {user.id} liked article {article_id}, new count: {likes_count}")
 
-        if article.author_id != user.id:
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.error(f"Error processing like for article {article_id}: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error processing like")
+
+    # Notification is fire-and-forget — must not roll back the already-committed like
+    if article.author_id != user.id:
+        try:
             await send_notification_to_user(
                 db=db,
                 user_id=article.author_id,
                 message=f"{user.username} liked your article \"{article.title}\"",
             )
-
-    except SQLAlchemyError as e:
-        db.rollback()
-        logger.error(f"Error processing like for article {article_id}: {str(e)}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error processing like")
+        except Exception:
+            pass  # notification failure must not fail the like operation
 
     return LikeResponse(
         message="Successfully liked the article.",
