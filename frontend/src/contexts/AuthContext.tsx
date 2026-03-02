@@ -8,14 +8,7 @@ import {
   useCallback,
 } from "react";
 
-export type User = {
-  id: number;
-  username: string;
-  email: string;
-  role: string;
-  bio?: string | null;
-  avatar_url?: string | null;
-};
+import type { User } from "@/types/user";
 
 type AuthContextType = {
   user: User | null;

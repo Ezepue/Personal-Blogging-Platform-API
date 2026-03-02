@@ -1,15 +1,9 @@
 import { cookies } from "next/headers";
 
-const API_URL = process.env.API_URL!;
+import { User } from "@/types/user";
+export type { User };
 
-export type User = {
-  id: number;
-  username: string;
-  email: string;
-  role: string;
-  bio?: string | null;
-  avatar_url?: string | null;
-};
+const API_URL = process.env.API_URL!;
 
 export async function getServerUser(): Promise<User | null> {
   const cookieStore = await cookies();
