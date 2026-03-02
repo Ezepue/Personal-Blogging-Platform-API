@@ -1,13 +1,13 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { useNotifications } from "@/hooks/useNotifications";
+import { useNotificationContext } from "@/contexts/NotificationContext";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function NotificationBell() {
   const { user } = useAuth();
-  const { notifications, unreadCount, markRead, markAllRead } = useNotifications();
+  const { notifications, unreadCount, markRead, markAllRead } = useNotificationContext();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const router = useRouter();
@@ -27,8 +27,9 @@ export default function NotificationBell() {
   const handleClick = (n: (typeof notifications)[number]) => {
     markRead(n.id);
     setOpen(false);
-    if (n.extra_data?.article_id) {
-      router.push(`/posts/${n.extra_data.article_id}`);
+    const articleId = n.extra_data?.article_id;
+    if (typeof articleId === "number" || typeof articleId === "string") {
+      router.push(`/posts/${articleId}`);
     }
   };
 

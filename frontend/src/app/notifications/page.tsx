@@ -2,19 +2,23 @@
 
 import { useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useNotifications } from "@/hooks/useNotifications";
+import { useNotificationContext } from "@/contexts/NotificationContext";
 import { useRouter } from "next/navigation";
 
 export default function NotificationsPage() {
   const { user, loading } = useAuth();
-  const { notifications, markRead, markAllRead } = useNotifications();
+  const { notifications, markRead, markAllRead } = useNotificationContext();
   const router = useRouter();
 
   useEffect(() => {
     if (!loading && !user) router.push("/login");
   }, [user, loading, router]);
 
-  if (loading || !user) return null;
+  if (loading || !user) return (
+    <div className="flex items-center justify-center min-h-[60vh]">
+      <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -39,7 +43,10 @@ export default function NotificationsPage() {
               key={n.id}
               onClick={() => {
                 markRead(n.id);
-                if (n.extra_data?.article_id) router.push(`/posts/${n.extra_data.article_id}`);
+                const articleId = n.extra_data?.article_id;
+                if (typeof articleId === "number" || typeof articleId === "string") {
+                  router.push(`/posts/${articleId}`);
+                }
               }}
               className={`bg-surface border rounded-xl px-5 py-4 cursor-pointer hover:border-accent transition-colors flex items-start gap-3 ${
                 !n.is_read ? "border-accent/40" : "border-border"
