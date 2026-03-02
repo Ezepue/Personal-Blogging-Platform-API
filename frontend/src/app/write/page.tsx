@@ -19,6 +19,7 @@ export default function WritePage() {
   const [category, setCategory] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [initialized, setInitialized] = useState(false);
 
   // Restore draft on mount
   useEffect(() => {
@@ -34,6 +35,7 @@ export default function WritePage() {
         // ignore malformed draft
       }
     }
+    setInitialized(true);
   }, []);
 
   // Auto-save every 30s
@@ -66,7 +68,6 @@ export default function WritePage() {
           content,
           tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
           category: category || undefined,
-          status: publish ? "PUBLISHED" : "DRAFT",
         }),
       });
       if (res.ok) {
@@ -112,7 +113,11 @@ export default function WritePage() {
         />
       </div>
 
-      <Editor content={content} onChange={setContent} />
+      {initialized ? (
+        <Editor content={content} onChange={setContent} />
+      ) : (
+        <div className="min-h-[400px] bg-surface border border-border rounded-xl" />
+      )}
 
       {error && <p className="text-red-400 text-sm mt-3">{error}</p>}
 
@@ -122,7 +127,7 @@ export default function WritePage() {
           disabled={saving}
           className="px-5 py-2.5 border border-border rounded-lg text-muted hover:text-[#f1f1f5] hover:border-[#f1f1f5] transition-colors disabled:opacity-50"
         >
-          Save Draft
+          {saving ? "Saving…" : "Save Draft"}
         </button>
         <button
           onClick={() => submit(true)}

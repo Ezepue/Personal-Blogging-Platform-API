@@ -33,11 +33,19 @@ export default function Editor({ content, onChange }: EditorProps) {
   const uploadImage = async (file: File) => {
     const formData = new FormData();
     formData.append("file", file);
-    const res = await fetch("/api/media/upload/", { method: "POST", body: formData });
-    if (res.ok) {
-      const data = await res.json();
-      editor?.chain().focus().setImage({ src: `/api/media/${data.filename}` }).run();
+    try {
+      const res = await fetch("/api/media/upload/", { method: "POST", body: formData });
+      if (res.ok) {
+        const data = await res.json();
+        editor?.chain().focus().setImage({ src: `/api/media/${data.filename}` }).run();
+      } else {
+        alert("Image upload failed. Please try again.");
+      }
+    } catch {
+      alert("Image upload failed. Please check your connection.");
     }
+    // Reset file input so same file can be re-uploaded
+    if (fileRef.current) fileRef.current.value = "";
   };
 
   if (!editor) return null;

@@ -26,7 +26,7 @@ export default function EditPage({ params }: { params: Promise<{ id: string }> }
   }, [user, loading, router]);
 
   useEffect(() => {
-    if (!id) return;
+    if (!id || loading) return;
     fetch(`/api/articles/${id}`)
       .then((r) => r.json())
       .then((article) => {
@@ -38,7 +38,7 @@ export default function EditPage({ params }: { params: Promise<{ id: string }> }
       })
       .catch(() => setError("Failed to load article"))
       .finally(() => setFetching(false));
-  }, [id]);
+  }, [id, loading]);
 
   if (loading || !user || fetching) return (
     <div className="flex items-center justify-center min-h-[60vh]">
