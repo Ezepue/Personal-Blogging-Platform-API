@@ -12,7 +12,7 @@ from schemas.article import ArticleCreate, ArticleUpdate, ArticleResponse
 from utils.auth_helpers import get_current_user, is_admin
 from utils.db_helpers import (
     create_new_article, get_article_by_id,
-    update_article, delete_article, get_articles
+    update_article, delete_article, get_articles, get_user_drafts
 )
 from models.user import UserDB
 
@@ -52,19 +52,34 @@ def list_articles(
     search: Optional[str] = None,
     category: Optional[str] = None,
     skip: int = 0,
-    limit: int = 10
+    limit: int = 10,
+    status: Optional[ArticleStatus] = ArticleStatus.PUBLISHED,
 ):
-    """ Fetch all articles with optional search and category filters. """
+    """ Fetch articles. Defaults to PUBLISHED only; pass status=DRAFT to filter drafts. """
 
     # Restrict pagination limits
     limit = min(50, max(1, limit))
 
-    # Modify the database query to handle search and category filters
-    articles = get_articles(db, search=search, category=category, skip=skip, limit=limit)
+    articles = get_articles(db, search=search, category=category, skip=skip, limit=limit, status=status)
 
-    logger.info(f"Fetched {len(articles)} articles (Search: '{search}', Category: '{category}').")
+    logger.info(f"Fetched {len(articles)} articles (Search: '{search}', Category: '{category}', Status: '{status}').")
 
     return articles or []
+
+
+@router.get("/my-drafts", response_model=List[ArticleResponse])
+def list_my_drafts(
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user),
+    skip: int = 0,
+    limit: int = 50,
+):
+    """ Return all DRAFT articles belonging to the authenticated user. """
+    is_author_or_above(current_user)
+    limit = min(100, max(1, limit))
+    drafts = get_user_drafts(db, author_id=current_user.id, skip=skip, limit=limit)
+    logger.info(f"User {current_user.id} fetched {len(drafts)} drafts.")
+    return drafts or []
 
 @router.get("/{article_id}", response_model=ArticleResponse)
 def read_article(article_id: int, db: Session = Depends(get_db)):
@@ -92,13 +107,13 @@ def update_existing_article(
     if article.author_id != current_user.id and not is_admin(current_user):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only edit your own articles")
 
-    # Ensure title and content are valid (Add custom validations if needed)
-    if not article_data.title or len(article_data.title) < 5:
+    # Only validate fields that were explicitly provided in the request
+    if article_data.title is not None and len(article_data.title) < 5:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Title must be at least 5 characters long."
         )
-    if not article_data.content or len(article_data.content) < 10:
+    if article_data.content is not None and len(article_data.content) < 10:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Content must be at least 10 characters long."

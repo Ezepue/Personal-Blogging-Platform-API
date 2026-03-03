@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import dynamic from "next/dynamic";
 
@@ -75,8 +76,11 @@ export default function WritePage() {
         localStorage.removeItem(DRAFT_KEY);
         if (publish) {
           await fetch(`/api/articles/${article.id}/publish`, { method: "PUT" });
+          router.push(`/posts/${article.id}`);
+        } else {
+          // Stay on the edit page for drafts so the user can continue editing
+          router.push(`/write/${article.id}`);
         }
-        router.push(`/posts/${article.id}`);
       } else {
         const err = await res.json().catch(() => ({}));
         setError((err as { detail?: string }).detail ?? "Failed to save");
@@ -88,6 +92,14 @@ export default function WritePage() {
 
   return (
     <div className="max-w-3xl mx-auto">
+      {/* Top bar */}
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-lg font-semibold text-[#f1f1f5]">New Post</h1>
+        <Link href="/drafts" className="text-sm text-muted hover:text-[#f1f1f5] transition-colors">
+          My Drafts →
+        </Link>
+      </div>
+
       <input
         type="text"
         value={title}

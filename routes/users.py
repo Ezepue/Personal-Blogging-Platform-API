@@ -4,17 +4,21 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request, UploadFi
 from sqlalchemy.orm import Session
 from fastapi.security import OAuth2PasswordRequestForm
 from datetime import timedelta
+from typing import List
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 from database import get_db
 from schemas.user import UserCreate, UserResponse, UserProfileUpdate, UserPasswordChange, UserPublicProfile
+from schemas.article import ArticleResponse
 from utils.auth_helpers import (
     create_access_token, get_current_user, hash_password, verify_password,
     verify_user_credentials, create_refresh_token, verify_refresh_token
 )
 from utils.db_helpers import create_new_user, get_user_by_username, update_user_profile
 from models.user import UserDB, UserRole
+from models.article import ArticleDB
+from models.enums import ArticleStatus
 from models.refresh_token import RefreshTokenDB
 from config import ACCESS_TOKEN_EXPIRE_MINUTES, REFRESH_TOKEN_EXPIRE_DAYS, UPLOAD_FOLDER
 
@@ -169,3 +173,25 @@ async def get_public_profile(username: str, db: Session = Depends(get_db)):
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return user
+
+
+@router.get("/{username}/articles", response_model=List[ArticleResponse])
+async def get_user_articles(
+    username: str,
+    db: Session = Depends(get_db),
+    skip: int = 0,
+    limit: int = 20,
+):
+    """Return published articles for a given user (public)."""
+    user = get_user_by_username(db, username)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    articles = (
+        db.query(ArticleDB)
+        .filter(ArticleDB.author_id == user.id, ArticleDB.status == ArticleStatus.PUBLISHED)
+        .order_by(ArticleDB.id.desc())
+        .offset(skip)
+        .limit(min(100, max(1, limit)))
+        .all()
+    )
+    return articles or []

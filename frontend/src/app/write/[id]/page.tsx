@@ -1,14 +1,15 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import dynamic from "next/dynamic";
 
 const Editor = dynamic(() => import("@/components/Editor"), { ssr: false });
 
-export default function EditPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
+export default function EditPage({ params }: { params: { id: string } }) {
+  const { id } = params;
   const { user, loading } = useAuth();
   const router = useRouter();
 
@@ -80,7 +81,12 @@ export default function EditPage({ params }: { params: Promise<{ id: string }> }
 
   return (
     <div className="max-w-3xl mx-auto">
-      <p className="text-xs text-muted mb-4">Editing post #{id}</p>
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-xs text-muted">Editing post #{id}</p>
+        <Link href="/drafts" className="text-sm text-muted hover:text-[#f1f1f5] transition-colors">
+          My Drafts →
+        </Link>
+      </div>
       <input
         type="text"
         value={title}
