@@ -175,9 +175,20 @@ def create_new_article(db: Session, article_data: ArticleCreate, author_id: int)
     logger.info(f"Article '{new_article.title}' created by user {author_id}.")
     return new_article
 
-def get_articles(db: Session, search: str = None, category: str = None, skip: int = 0, limit: int = 10):
-    """Fetch articles based on search and category filters."""
+def get_articles(
+    db: Session,
+    search: str = None,
+    category: str = None,
+    skip: int = 0,
+    limit: int = 10,
+    status: ArticleStatus = ArticleStatus.PUBLISHED,
+):
+    """Fetch articles based on search, category, and status filters."""
     query = db.query(ArticleDB)
+
+    # Filter by status (defaults to PUBLISHED for public feeds)
+    if status is not None:
+        query = query.filter(ArticleDB.status == status)
 
     # Case-insensitive search filter
     if search:
@@ -190,7 +201,19 @@ def get_articles(db: Session, search: str = None, category: str = None, skip: in
     if category:
         query = query.filter(func.lower(ArticleDB.category) == func.lower(category))
 
-    return query.offset(skip).limit(limit).all()
+    return query.order_by(ArticleDB.id.desc()).offset(skip).limit(limit).all()
+
+
+def get_user_drafts(db: Session, author_id: int, skip: int = 0, limit: int = 50):
+    """Fetch DRAFT articles belonging to a specific author."""
+    return (
+        db.query(ArticleDB)
+        .filter(ArticleDB.author_id == author_id, ArticleDB.status == ArticleStatus.DRAFT)
+        .order_by(ArticleDB.id.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
 
 def get_article_by_id(db: Session, article_id: int) -> ArticleDB:
     """Fetch an article by ID, with logging and error handling."""
