@@ -7,6 +7,15 @@ from alembic import context
 # Import your database Base and connection URL
 from database import Base, DATABASE_URL
 
+# Import all models so their tables are registered on Base.metadata
+# before Alembic compares against the live database.
+import models.user          # noqa: F401
+import models.article       # noqa: F401
+import models.comment       # noqa: F401
+import models.like          # noqa: F401
+import models.refresh_token # noqa: F401
+import models.notification  # noqa: F401
+
 # Alembic Config object
 config = context.config
 
@@ -18,7 +27,7 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 # Set target metadata (used for autogenerate)
-target_metadata = Base.metadata  # FIXED: Now Alembic detects models
+target_metadata = Base.metadata
 
 def run_migrations_offline():
     """Run migrations in 'offline' mode."""
