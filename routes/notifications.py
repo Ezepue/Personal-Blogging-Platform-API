@@ -19,8 +19,9 @@ logger = logging.getLogger(__name__)
 async def websocket_endpoint(websocket: WebSocket, user_id: int, token: str = Query(...)):
     """WebSocket endpoint with authentication."""
     # Verify the token before allowing connection
+    # JWT payload uses "sub" (string) for the user ID
     user_data = verify_access_token(token)
-    if not user_data or user_data.get("user_id") != user_id:
+    if not user_data or int(user_data.get("sub", -1)) != user_id:
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return
 

@@ -90,6 +90,8 @@ def promote_user(db: Session, user_id: int, new_role: str):
 
         logger.info(f"User {user.username} (ID: {user.id}) promoted to {new_role}")
         return user
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error promoting user: {e}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
@@ -131,16 +133,10 @@ def get_all_users(db: Session) -> List[UserDB]:
     """Fetch all users from the database."""
     try:
         users = db.query(UserDB).all()
-
-        if not users:
-            logger.warning("No users found in the database")
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="No users found"
-            )
-
         logger.info(f"Retrieved {len(users)} users from the database")
         return users
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error retrieving users: {e}")
         raise HTTPException(
@@ -204,6 +200,8 @@ def get_article_by_id(db: Session, article_id: int) -> ArticleDB:
             )
         logger.info(f"Article with ID {article_id} retrieved successfully")
         return article
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error fetching article {article_id}: {e}")
         raise HTTPException(
@@ -238,6 +236,8 @@ def update_article(db: Session, article_id: int, article_data: ArticleUpdate) ->
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Failed to update article"
             )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Unexpected error updating article {article_id}: {type(e).__name__}: {e}")
         raise HTTPException(
@@ -283,16 +283,10 @@ def get_comments_by_article(db: Session, article_id: int, skip: int = 0, limit: 
     """Retrieve all comments for a given article."""
     try:
         comments = db.query(CommentDB).filter(CommentDB.article_id == article_id).all()
-
-        if not comments:
-            logger.warning(f"No comments found for article ID {article_id}")
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"No comments found for article ID {article_id}"
-            )
-
         logger.info(f"Retrieved {len(comments)} comments for article ID {article_id}")
         return comments
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error retrieving comments for article {article_id}: {e}")
         raise HTTPException(
@@ -314,6 +308,8 @@ def get_comment_by_id(db: Session, comment_id: int) -> CommentDB:
 
         logger.info(f"Retrieved comment ID {comment_id}")
         return comment
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error retrieving comment {comment_id}: {e}")
         raise HTTPException(
@@ -341,16 +337,10 @@ def get_all_comments(db: Session):
     """Retrieve all comments from the database."""
     try:
         comments = db.query(CommentDB).all()
-
-        if not comments:
-            logger.info("No comments found in the database.")
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="No comments found"
-            )
-
         logger.info(f"Retrieved {len(comments)} comments from the database.")
         return comments
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error retrieving comments: {e}")
         raise HTTPException(

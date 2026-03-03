@@ -54,15 +54,14 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     return encoded_token
 
 def verify_access_token(token: str) -> Optional[dict]:
-    """Verify and decode the JWT access token."""
+    """Verify and decode the JWT access token. Returns None on failure (safe for WS callers)."""
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         if "exp" in payload and datetime.utcfromtimestamp(payload["exp"]) < datetime.utcnow():
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expired")
-
+            return None  # expired
         return payload  # The decoded token data (contains user info)
     except JWTError:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+        return None
 
 def create_refresh_token(user_id: int, db: Session) -> str:
     try:
