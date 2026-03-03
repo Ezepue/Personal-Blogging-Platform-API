@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import NotificationBell from "./NotificationBell";
+import Logo from "./Logo";
 
 export default function Navbar() {
   const { user, logout, loading } = useAuth();
@@ -11,12 +12,7 @@ export default function Navbar() {
     <nav className="bg-surface border-b border-border sticky top-0 z-50">
       <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
         {/* Logo */}
-        <Link
-          href="/"
-          className="font-bold text-lg text-[#f1f1f5] hover:text-accent transition-colors"
-        >
-          Blog
-        </Link>
+        <Logo />
 
         {/* Nav links */}
         <div className="flex items-center gap-4 text-sm">
@@ -28,6 +24,14 @@ export default function Navbar() {
               >
                 Write
               </Link>
+              {(user.role === "AUTHOR" || user.role === "ADMIN" || user.role === "SUPER_ADMIN") && (
+                <Link
+                  href="/drafts"
+                  className="text-muted hover:text-[#f1f1f5] transition-colors"
+                >
+                  Drafts
+                </Link>
+              )}
               <NotificationBell />
               <Link
                 href={`/profile/${user.username}`}
