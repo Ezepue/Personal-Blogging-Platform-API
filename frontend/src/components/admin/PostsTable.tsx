@@ -15,15 +15,21 @@ export default function PostsTable() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const res = await fetch("/api/admin/articles");
       if (res.ok) {
         const data = await res.json();
         setPosts(Array.isArray(data) ? data : []);
+      } else {
+        setError("Failed to load posts");
       }
+    } catch {
+      setError("Network error — could not load posts");
     } finally {
       setLoading(false);
     }
@@ -36,7 +42,15 @@ export default function PostsTable() {
     setDeleting(id);
     try {
       const res = await fetch(`/api/admin/articles/${id}`, { method: "DELETE" });
-      if (res.ok) await load();
+      if (res.ok) {
+        setError(null);
+        await load();
+      } else {
+        const err = await res.json().catch(() => ({})) as { detail?: string };
+        setError(err.detail ?? "Failed to delete post");
+      }
+    } catch {
+      setError("Network error — could not delete post");
     } finally {
       setDeleting(null);
     }
@@ -50,6 +64,9 @@ export default function PostsTable() {
 
   return (
     <div className="overflow-x-auto">
+      {error && (
+        <p className="text-red-400 text-sm mb-4">{error}</p>
+      )}
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-border text-left text-muted">

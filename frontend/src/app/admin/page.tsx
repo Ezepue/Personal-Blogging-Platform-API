@@ -20,6 +20,9 @@ export default function AdminPage() {
   const [tab, setTab] = useState<"posts" | "users" | "comments">("posts");
   const [stats, setStats] = useState<Stats | null>(null);
 
+  // Compute isSuperAdmin early so it can be used in effects below the guard
+  const isSuperAdmin = user?.role === "SUPER_ADMIN";
+
   // Role guard
   useEffect(() => {
     if (!loading && (!user || (user.role !== "ADMIN" && user.role !== "SUPER_ADMIN"))) {
@@ -27,34 +30,58 @@ export default function AdminPage() {
     }
   }, [user, loading, router]);
 
-  // Load stats
+  // Reset to "posts" if a non-super-admin somehow has "users" as active tab
+  useEffect(() => {
+    if (!isSuperAdmin && tab === "users") setTab("posts");
+  }, [isSuperAdmin, tab]);
+
+  // Load stats — only fetch users endpoint for SUPER_ADMIN
   useEffect(() => {
     if (!user) return;
-    Promise.all([
-      fetch("/api/admin/users").then((r) => r.ok ? r.json() : []),
+    const fetches = [
       fetch("/api/admin/articles").then((r) => r.ok ? r.json() : []),
       fetch("/api/admin/comments").then((r) => r.ok ? r.json() : []),
       fetch("/api/admin/active-sessions").then((r) => r.ok ? r.json() : []),
-    ]).then(([users, posts, comments, sessions]) => {
-      setStats({
-        users: Array.isArray(users) ? users.length : 0,
-        posts: Array.isArray(posts) ? posts.length : 0,
-        comments: Array.isArray(comments) ? comments.length : 0,
-        sessions: Array.isArray(sessions) ? sessions.length : 0,
-      });
-    }).catch(() => {/* silently ignore stats load failure */});
-  }, [user]);
+    ];
+    if (isSuperAdmin) {
+      fetches.unshift(fetch("/api/admin/users").then((r) => r.ok ? r.json() : []));
+      Promise.all(fetches).then(([users, posts, comments, sessions]) => {
+        setStats({
+          users: Array.isArray(users) ? users.length : 0,
+          posts: Array.isArray(posts) ? posts.length : 0,
+          comments: Array.isArray(comments) ? comments.length : 0,
+          sessions: Array.isArray(sessions) ? sessions.length : 0,
+        });
+      }).catch(() => {/* silently ignore stats load failure */});
+    } else {
+      Promise.all(fetches).then(([posts, comments, sessions]) => {
+        setStats({
+          users: 0,
+          posts: Array.isArray(posts) ? posts.length : 0,
+          comments: Array.isArray(comments) ? comments.length : 0,
+          sessions: Array.isArray(sessions) ? sessions.length : 0,
+        });
+      }).catch(() => {/* silently ignore stats load failure */});
+    }
+  }, [user, isSuperAdmin]);
 
-  if (loading || !user) return (
-    <div className="flex items-center justify-center min-h-[60vh]">
-      <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
-    </div>
-  );
+  // Show spinner while loading, or while user is absent, or while redirect is pending
+  if (loading || !user || (user.role !== "ADMIN" && user.role !== "SUPER_ADMIN")) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
-  const isSuperAdmin = user.role === "SUPER_ADMIN";
+  const tabs = [
+    "posts",
+    ...(isSuperAdmin ? (["users"] as const) : []),
+    "comments",
+  ] as const;
 
   const statItems = [
-    { label: "Total users", value: stats?.users },
+    ...(isSuperAdmin ? [{ label: "Total users", value: stats?.users }] : []),
     { label: "Total posts", value: stats?.posts },
     { label: "Total comments", value: stats?.comments },
     { label: "Active sessions", value: stats?.sessions },
@@ -78,7 +105,7 @@ export default function AdminPage() {
 
       {/* Tab bar */}
       <div className="flex gap-1 bg-surface border border-border rounded-lg p-1 mb-6 w-fit">
-        {(["posts", "users", "comments"] as const).map((t) => (
+        {tabs.map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -94,7 +121,7 @@ export default function AdminPage() {
       {/* Tab content */}
       <div className="bg-surface border border-border rounded-xl p-4">
         {tab === "posts" && <PostsTable />}
-        {tab === "users" && <UsersTable isSuperAdmin={isSuperAdmin} />}
+        {tab === "users" && <UsersTable isSuperAdmin={isSuperAdmin} currentUserId={user.id} />}
         {tab === "comments" && <CommentsTable />}
       </div>
     </div>

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 
-const ROLES = ["READER", "AUTHOR", "ADMIN", "SUPER_ADMIN"];
+const ASSIGNABLE_ROLES = ["READER", "AUTHOR", "ADMIN"];
 
 type User = {
   id: number;
@@ -11,20 +11,32 @@ type User = {
   role: string;
 };
 
-export default function UsersTable({ isSuperAdmin }: { isSuperAdmin: boolean }) {
+export default function UsersTable({
+  isSuperAdmin,
+  currentUserId,
+}: {
+  isSuperAdmin: boolean;
+  currentUserId: number;
+}) {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<number | null>(null);
   const [changingRole, setChangingRole] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const res = await fetch("/api/admin/users");
       if (res.ok) {
         const data = await res.json();
         setUsers(Array.isArray(data) ? data : []);
+      } else {
+        setError("Failed to load users");
       }
+    } catch {
+      setError("Network error — could not load users");
     } finally {
       setLoading(false);
     }
@@ -40,7 +52,15 @@ export default function UsersTable({ isSuperAdmin }: { isSuperAdmin: boolean }) 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ role }),
       });
-      if (res.ok) await load();
+      if (res.ok) {
+        setError(null);
+        await load();
+      } else {
+        const err = await res.json().catch(() => ({})) as { detail?: string };
+        setError(err.detail ?? "Failed to change role");
+      }
+    } catch {
+      setError("Network error — could not change role");
     } finally {
       setChangingRole(null);
     }
@@ -51,7 +71,15 @@ export default function UsersTable({ isSuperAdmin }: { isSuperAdmin: boolean }) 
     setDeleting(id);
     try {
       const res = await fetch(`/api/admin/${id}`, { method: "DELETE" });
-      if (res.ok) await load();
+      if (res.ok) {
+        setError(null);
+        await load();
+      } else {
+        const err = await res.json().catch(() => ({})) as { detail?: string };
+        setError(err.detail ?? "Failed to delete user");
+      }
+    } catch {
+      setError("Network error — could not delete user");
     } finally {
       setDeleting(null);
     }
@@ -65,6 +93,9 @@ export default function UsersTable({ isSuperAdmin }: { isSuperAdmin: boolean }) 
 
   return (
     <div className="overflow-x-auto">
+      {error && (
+        <p className="text-red-400 text-sm mb-4">{error}</p>
+      )}
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-border text-left text-muted">
@@ -85,17 +116,21 @@ export default function UsersTable({ isSuperAdmin }: { isSuperAdmin: boolean }) 
                 <td className="py-3 pr-4 text-[#f1f1f5]">{u.username}</td>
                 <td className="py-3 pr-4 text-muted">{u.email}</td>
                 <td className="py-3 pr-4">
-                  {isSuperAdmin ? (
-                    <select
-                      value={u.role}
-                      disabled={changingRole === u.id}
-                      onChange={(e) => changeRole(u.id, e.target.value)}
-                      className="bg-hover border border-border rounded px-2 py-1 text-[#f1f1f5] text-xs focus:outline-none focus:border-accent disabled:opacity-50"
-                    >
-                      {ROLES.map((r) => (
-                        <option key={r} value={r}>{r}</option>
-                      ))}
-                    </select>
+                  {isSuperAdmin && u.id !== currentUserId ? (
+                    u.role === "SUPER_ADMIN" ? (
+                      <span className="text-muted text-xs">SUPER_ADMIN</span>
+                    ) : (
+                      <select
+                        value={u.role}
+                        disabled={changingRole === u.id}
+                        onChange={(e) => changeRole(u.id, e.target.value)}
+                        className="bg-hover border border-border rounded px-2 py-1 text-[#f1f1f5] text-xs focus:outline-none focus:border-accent disabled:opacity-50"
+                      >
+                        {ASSIGNABLE_ROLES.map((r) => (
+                          <option key={r} value={r}>{r}</option>
+                        ))}
+                      </select>
+                    )
                   ) : (
                     <span className="text-muted text-xs">{u.role}</span>
                   )}
@@ -104,7 +139,7 @@ export default function UsersTable({ isSuperAdmin }: { isSuperAdmin: boolean }) 
                   <td className="py-3">
                     <button
                       onClick={() => deleteUser(u.id)}
-                      disabled={deleting === u.id}
+                      disabled={deleting === u.id || u.id === currentUserId}
                       className="text-red-400 hover:text-red-300 text-xs transition-colors disabled:opacity-50"
                     >
                       {deleting === u.id ? "Deleting…" : "Delete"}

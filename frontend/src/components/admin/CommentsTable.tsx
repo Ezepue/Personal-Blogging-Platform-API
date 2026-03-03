@@ -14,15 +14,21 @@ export default function CommentsTable() {
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const res = await fetch("/api/admin/comments");
       if (res.ok) {
         const data = await res.json();
         setComments(Array.isArray(data) ? data : []);
+      } else {
+        setError("Failed to load comments");
       }
+    } catch {
+      setError("Network error — could not load comments");
     } finally {
       setLoading(false);
     }
@@ -35,7 +41,15 @@ export default function CommentsTable() {
     setDeleting(id);
     try {
       const res = await fetch(`/api/admin/comments/${id}`, { method: "DELETE" });
-      if (res.ok) await load();
+      if (res.ok) {
+        setError(null);
+        await load();
+      } else {
+        const err = await res.json().catch(() => ({})) as { detail?: string };
+        setError(err.detail ?? "Failed to delete comment");
+      }
+    } catch {
+      setError("Network error — could not delete comment");
     } finally {
       setDeleting(null);
     }
@@ -49,6 +63,9 @@ export default function CommentsTable() {
 
   return (
     <div className="overflow-x-auto">
+      {error && (
+        <p className="text-red-400 text-sm mb-4">{error}</p>
+      )}
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-border text-left text-muted">
@@ -71,7 +88,7 @@ export default function CommentsTable() {
                 </td>
                 <td className="py-3 pr-4 text-muted">{c.user?.username ?? "—"}</td>
                 <td className="py-3 pr-4 text-muted text-xs">
-                  {new Date(c.created_date).toLocaleDateString()}
+                  {c.created_date ? new Date(c.created_date).toLocaleDateString() : "—"}
                 </td>
                 <td className="py-3">
                   <button
