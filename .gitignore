@@ -2,3 +2,8 @@
 venv/
 *.pyc
 __pycache__/
+
+# Vim swap files
+*.swp
+*.swo
+*~
