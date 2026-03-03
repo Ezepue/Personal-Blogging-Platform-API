@@ -1,5 +1,5 @@
 import re
-from sqlalchemy import Column, Integer, String, Enum, Index, Text
+from sqlalchemy import Boolean, Column, Integer, String, Enum, Index, Text
 from sqlalchemy.orm import relationship, validates
 from database import Base
 from .enums import UserRole
@@ -12,6 +12,7 @@ class UserDB(Base):
     email = Column(String, unique=True, nullable=False, index=True)
     hashed_password = Column(String, nullable=False)
     role = Column(Enum(UserRole, native_enum=False), default=UserRole.READER, nullable=False, index=True)
+    is_active = Column(Boolean, default=True, nullable=False)
     bio = Column(Text, nullable=True)
     avatar_url = Column(String(500), nullable=True)
 

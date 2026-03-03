@@ -7,25 +7,29 @@ class UserCreate(BaseModel):
     email: EmailStr
     password: SecretStr = Field(..., min_length=8, description="Password must be at least 8 characters long and strong.")
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "username": "john_doe",
                 "email": "john.doe@example.com",
-                "password": "strong_password_123"
+                "password": "strong_password_123",
             }
         }
+    )
+
 
 class PromoteUserRequest(BaseModel):
     new_role: UserRole = Field(..., description="Valid roles: reader, admin, super_admin")
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "user_id": 101,
-                "new_role": "admin"
+                "new_role": "admin",
             }
         }
+    )
+
 
 class UserResponse(BaseModel):
     id: int
@@ -33,16 +37,17 @@ class UserResponse(BaseModel):
     email: EmailStr
     role: UserRole
 
-    class Config:
-        from_attributes = True
-        json_schema_extra = {
+    model_config = ConfigDict(
+        from_attributes=True,
+        json_schema_extra={
             "example": {
                 "id": 101,
                 "username": "john_doe",
                 "email": "john.doe@example.com",
-                "role": "reader"
+                "role": "reader",
             }
-        }
+        },
+    )
 
 class UserProfileUpdate(BaseModel):
     username: Optional[str] = None

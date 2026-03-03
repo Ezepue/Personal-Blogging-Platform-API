@@ -1,4 +1,6 @@
 import logging
+import os
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from database import Base, engine
 from models import *  # Ensure all models are imported before creating tables
@@ -20,8 +22,19 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# --- Lifespan (startup / shutdown) ---
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Initialise the DB on startup; clean up on shutdown."""
+    logger.info("Initializing database...")
+    Base.metadata.create_all(bind=engine)
+    logger.info("Database initialized successfully.")
+    yield
+    logger.info("Shutting down server...")
+
+
 # --- Initialize FastAPI ---
-app = FastAPI(title="Personal Blogging Platform API")
+app = FastAPI(title="Personal Blogging Platform API", lifespan=lifespan)
 
 # --- Rate Limiting Setup ---
 limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])
@@ -48,27 +61,9 @@ app.add_middleware(
 )
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(SlowAPIMiddleware)
-app.add_middleware(
-    TrustedHostMiddleware,
-    allowed_hosts=["yourdomain.com", "127.0.0.1", "localhost"]
-)
-
-# --- Database Initialization ---
-def init_db():
-    """Ensures database tables exist before starting."""
-    logger.info("Initializing database...")
-    Base.metadata.create_all(bind=engine)
-    logger.info("Database initialized successfully.")
-
-@app.on_event("startup")
-def startup_event():
-    """Runs on server startup."""
-    init_db()
-
-@app.on_event("shutdown")
-def shutdown_event():
-    """Handles any cleanup or closing operations during shutdown."""
-    logger.info("Shutting down server...")
+_raw_hosts = os.getenv("ALLOWED_HOSTS", "yourdomain.com,127.0.0.1,localhost")
+_allowed_hosts = [h.strip() for h in _raw_hosts.split(",") if h.strip()]
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=_allowed_hosts)
 
 # --- Register Routers ---
 app.include_router(users.router, prefix="/users", tags=["Users"])

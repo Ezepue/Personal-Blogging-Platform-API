@@ -221,7 +221,7 @@ def update_article(db: Session, article_id: int, article_data: ArticleUpdate) ->
                 detail=f"Article with ID {article_id} not found"
             )
 
-        for key, value in article_data.dict(exclude_unset=True).items():
+        for key, value in article_data.model_dump(exclude_unset=True).items():
             setattr(article, key, value)
 
         try:
@@ -318,14 +318,18 @@ def get_comment_by_id(db: Session, comment_id: int) -> CommentDB:
         )
 
 
-def delete_comment(db: Session, comment_id: int, user: UserDB, allow_admin: bool = False):
-    """Delete a comment by the user who made it, or by an admin."""
+def delete_comment(db: Session, comment_id: int, user: UserDB, allow_admin: bool = False, force: bool = False):
+    """Delete a comment by the user who made it, or by an admin.
+
+    Pass force=True when the caller has already verified authorization (e.g. the
+    article author deleting a comment on their own article via the route layer).
+    """
     comment = db.query(CommentDB).filter(CommentDB.id == comment_id).first()
     if not comment:
         raise HTTPException(status_code=404, detail="Comment not found")
 
     # Check if user has permission to delete
-    if comment.user_id == user.id or (allow_admin and user.role in {UserRole.ADMIN, UserRole.SUPER_ADMIN}):
+    if force or comment.user_id == user.id or (allow_admin and user.role in {UserRole.ADMIN, UserRole.SUPER_ADMIN}):
         db.delete(comment)
         db.commit()
         logger.info(f"Comment {comment_id} deleted by user {user.id}.")

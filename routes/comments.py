@@ -11,6 +11,7 @@ from utils.db_helpers import (
 )
 from utils.notification_helper import send_notification_to_user
 from models.user import UserDB
+from models.enums import UserRole
 
 # Logger setup
 logger = logging.getLogger(__name__)
@@ -80,7 +81,8 @@ def remove_comment(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found")
 
     # Ensure permission for deletion
-    if comment.user_id == current_user.id or is_admin(current_user):
+    # NOTE: is_admin() raises rather than returns False, so check the role directly here
+    if comment.user_id == current_user.id or current_user.role in {UserRole.ADMIN, UserRole.SUPER_ADMIN}:
         delete_comment(db, comment_id, current_user)
         logger.info(f"User {current_user.id} deleted comment {comment_id} on article ID {comment.article_id}")
         return {"status": "success", "detail": f"Comment {comment_id} deleted successfully"}
@@ -88,7 +90,7 @@ def remove_comment(
     # Fetch article only if needed
     article = get_article_by_id(db, comment.article_id)
     if article and article.author_id == current_user.id:
-        delete_comment(db, comment_id, current_user)
+        delete_comment(db, comment_id, current_user, force=True)
         logger.info(f"Article author {current_user.id} deleted comment {comment_id} on their article '{article.title}'")
         return {"status": "success", "detail": f"Comment {comment_id} deleted successfully"}
 

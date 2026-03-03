@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Enum, Text, func
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Enum, Text, JSON, func
 from sqlalchemy.orm import relationship, column_property
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.sql import select
@@ -12,7 +12,8 @@ class ArticleDB(Base):
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String, nullable=False, index=True)
     content = Column(Text, nullable=False)
-    tags = Column(JSONB, nullable=False, default=lambda: [])
+    # JSON on SQLite (tests), JSONB on PostgreSQL (production) — functionally identical
+    tags = Column(JSON().with_variant(JSONB(), "postgresql"), nullable=False, default=list)
     category = Column(String, nullable=True)
 
     status = Column(Enum(ArticleStatus, native_enum=True), default=ArticleStatus.DRAFT, nullable=False)

@@ -9,7 +9,7 @@ from config import FRONTEND_URL
 from models.article import ArticleDB
 from models.enums import ArticleStatus
 from schemas.article import ArticleCreate, ArticleUpdate, ArticleResponse
-from utils.auth_helpers import get_current_user, is_admin
+from utils.auth_helpers import get_current_user, is_admin, is_author_or_above
 from utils.db_helpers import (
     create_new_article, get_article_by_id,
     update_article, delete_article, get_articles
@@ -29,7 +29,8 @@ def create_article(
     db: Session = Depends(get_db),
     current_user: UserDB = Depends(get_current_user)
 ):
-    """ Create a new article. Only authenticated users can post. """
+    """ Create a new article. Only authors and above can post. """
+    is_author_or_above(current_user)
     # Ensure title and content are valid (Add custom validations if needed)
     if not article.title or len(article.title) < 5:
         raise HTTPException(

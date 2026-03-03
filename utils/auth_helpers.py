@@ -200,5 +200,20 @@ def is_super_admin(user: UserDB):
     logger.info(f"User {user.username} granted super admin access.")
     return True
 
+def is_author_or_above(user: UserDB):
+    """Check that user is at least AUTHOR (AUTHOR, ADMIN, or SUPER_ADMIN).
+
+    READERs are read-only — they cannot create or edit content.
+    """
+    logger.info(f"Checking author access for user {user.username}, role: {user.role}")
+    if user.role not in {UserRole.AUTHOR, UserRole.ADMIN, UserRole.SUPER_ADMIN}:
+        logger.warning(f"Access denied: {user.username} (role: {user.role}) cannot create content.")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only authors and above can create or edit content",
+        )
+    logger.info(f"User {user.username} granted author access.")
+    return True
+
 # Logging Configuration (to be called in main.py or the entry point)
 logging.basicConfig(level=logging.INFO)

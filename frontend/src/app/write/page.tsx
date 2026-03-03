@@ -47,10 +47,12 @@ export default function WritePage() {
   }, [title, content, tags, category]);
 
   useEffect(() => {
-    if (!loading && !user) router.push("/login");
+    if (loading) return;
+    if (!user) { router.push("/login"); return; }
+    if (user.role === "READER") { router.push("/"); return; }
   }, [user, loading, router]);
 
-  if (loading || !user) return null;
+  if (loading || !user || user.role === "READER") return null;
 
   const submit = async (publish: boolean) => {
     if (!title.trim() || !content.trim()) {
