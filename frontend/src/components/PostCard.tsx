@@ -23,14 +23,14 @@ function excerpt(content: string, maxLen = 120): string {
 }
 
 export default function PostCard({ post }: { post: Post }) {
-  const initials = post.author.username[0]?.toUpperCase() ?? "?";
+  const initials = post.author?.username?.[0]?.toUpperCase() ?? "?";
 
   return (
     <article className="bg-surface border border-border rounded-xl p-6 hover:border-accent transition-colors group">
       {/* Author row */}
       <div className="flex items-center gap-2 mb-3 text-sm text-muted">
         <div className="w-6 h-6 rounded-full bg-accent/20 flex items-center justify-center text-xs font-bold text-accent flex-shrink-0 overflow-hidden">
-          {post.author.avatar_url ? (
+          {post.author?.avatar_url ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={post.author.avatar_url}
@@ -41,7 +41,7 @@ export default function PostCard({ post }: { post: Post }) {
             initials
           )}
         </div>
-        <span>{post.author.username}</span>
+        <span>{post.author?.username ?? "Unknown"}</span>
         <span aria-hidden>·</span>
         <span>{readTime(post.content)} min read</span>
         {post.published_date && (

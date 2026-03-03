@@ -89,14 +89,14 @@ export default function CommentSection({ articleId }: { articleId: number }) {
           >
             <div className="flex items-center gap-2 mb-2 text-sm text-muted">
               <div className="w-5 h-5 rounded-full bg-accent/20 flex items-center justify-center text-xs font-bold text-accent flex-shrink-0 overflow-hidden">
-                {c.user.avatar_url ? (
+                {c.user?.avatar_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={c.user.avatar_url} alt={c.user.username} className="w-full h-full object-cover" />
+                  <img src={c.user.avatar_url} alt={c.user?.username} className="w-full h-full object-cover" />
                 ) : (
-                  c.user.username[0]?.toUpperCase()
+                  c.user?.username?.[0]?.toUpperCase() ?? "?"
                 )}
               </div>
-              <span>{c.user.username}</span>
+              <span>{c.user?.username ?? "Unknown"}</span>
               <span aria-hidden>·</span>
               <span>{new Date(c.created_date).toLocaleDateString()}</span>
             </div>

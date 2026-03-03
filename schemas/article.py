@@ -3,6 +3,12 @@ from typing import List, Optional
 from datetime import datetime
 from models.enums import ArticleStatus
 
+class ArticleAuthor(BaseModel):
+    username: str
+    avatar_url: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
 class ArticleCreate(BaseModel):
     title: str = Field(..., min_length=3, max_length=200)
     content: str = Field(..., min_length=10)
@@ -27,6 +33,7 @@ class ArticleResponse(BaseModel):
     published_date: Optional[datetime] = None
     updated_date: Optional[datetime] = None
     author_id: int
+    author: Optional[ArticleAuthor] = None
     likes_count: int = Field(default=0, ge=0, description="Total likes on the article")
 
     model_config = ConfigDict(from_attributes=True)
