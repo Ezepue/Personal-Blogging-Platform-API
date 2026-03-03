@@ -3,6 +3,9 @@ import PostCard from "@/components/PostCard";
 import ProfileDraftsTab from "@/components/ProfileDraftsTab";
 import type { Metadata } from "next";
 
+// Always render fresh — never serve stale cached data
+export const dynamic = "force-dynamic";
+
 const API_URL = process.env.API_URL ?? "http://localhost:8000";
 
 type Profile = {
@@ -15,7 +18,7 @@ type Profile = {
 
 async function getProfile(username: string): Promise<Profile | null> {
   const res = await fetch(`${API_URL}/users/${username}/profile`, {
-    next: { revalidate: 60 },
+    cache: "no-store",
   });
   if (!res.ok) return null;
   return res.json();
@@ -24,7 +27,7 @@ async function getProfile(username: string): Promise<Profile | null> {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function getUserPosts(username: string): Promise<any[]> {
   const res = await fetch(`${API_URL}/users/${username}/articles?limit=100`, {
-    next: { revalidate: 60 },
+    cache: "no-store",
   });
   if (!res.ok) return [];
   return res.json();

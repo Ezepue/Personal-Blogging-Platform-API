@@ -2,7 +2,10 @@ import PostCard, { Post } from "@/components/PostCard";
 import SearchBar from "@/components/SearchBar";
 import CategoryPills from "@/components/CategoryPills";
 
-const API_URL = process.env.API_URL!;
+// Always render fresh — never serve stale cached data
+export const dynamic = "force-dynamic";
+
+const API_URL = process.env.API_URL ?? "http://localhost:8000";
 
 async function getPosts(search?: string, category?: string): Promise<Post[]> {
   const params = new URLSearchParams();
@@ -13,7 +16,7 @@ async function getPosts(search?: string, category?: string): Promise<Post[]> {
 
   try {
     const res = await fetch(`${API_URL}/articles/?${params}`, {
-      next: { revalidate: 60 },
+      cache: "no-store", // always fetch fresh so router.refresh() works correctly
     });
     if (!res.ok) return [];
     return res.json();

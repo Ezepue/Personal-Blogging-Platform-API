@@ -4,12 +4,15 @@ import LikeButton from "@/components/LikeButton";
 import CommentSection from "@/components/CommentSection";
 import type { Metadata } from "next";
 
-const API_URL = process.env.API_URL!;
+// Always render fresh — never serve stale cached data
+export const dynamic = "force-dynamic";
+
+const API_URL = process.env.API_URL ?? "http://localhost:8000";
 
 async function getPost(id: string) {
   try {
     const res = await fetch(`${API_URL}/articles/${id}`, {
-      next: { revalidate: 60 },
+      cache: "no-store",
     });
     if (!res.ok) return null;
     return res.json();
