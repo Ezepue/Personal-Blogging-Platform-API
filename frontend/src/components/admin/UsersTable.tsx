@@ -50,7 +50,7 @@ export default function UsersTable({
       const res = await fetch(`/api/admin/${userId}/role`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role }),
+        body: JSON.stringify({ new_role: role }),
       });
       if (res.ok) {
         setError(null);
