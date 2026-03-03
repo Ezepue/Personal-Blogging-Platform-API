@@ -49,17 +49,47 @@ def get_unread_notifications(
     """Fetch unread notifications for the current user."""
     return fetch_unread_notifications(db, current_user.id, skip, limit)
 
-# Function to send a notification to a user via WebSocket
-async def send_notification_to_user(user_id: int, message: str):
-    """Send a notification and store it in DB"""
-    db = next(get_db())
-    new_notification = NotificationDB(user_id=user_id, message=message, is_read=False)
-    db.add(new_notification)
+@router.post("/read/{notification_id}")
+async def mark_read(
+    notification_id: int,
+    current_user: UserDB = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    notif = db.query(NotificationDB).filter(
+        NotificationDB.id == notification_id,
+        NotificationDB.user_id == current_user.id,
+    ).first()
+    if not notif:
+        raise HTTPException(status_code=404, detail="Notification not found")
+    notif.is_read = True
     db.commit()
-    db.refresh(new_notification)
+    return {"message": "Marked as read"}
 
-    if user_id in websocket_manager.active_connections:
-        await websocket_manager.active_connections[user_id].send_json({"message": message})
+@router.post("/read-all")
+async def mark_all_read(
+    current_user: UserDB = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    db.query(NotificationDB).filter(
+        NotificationDB.user_id == current_user.id,
+        NotificationDB.is_read == False,
+    ).update({"is_read": True})
+    db.commit()
+    return {"message": "All notifications marked as read"}
 
-    return new_notification
+@router.delete("/{notification_id}")
+async def delete_notification(
+    notification_id: int,
+    current_user: UserDB = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    notif = db.query(NotificationDB).filter(
+        NotificationDB.id == notification_id,
+        NotificationDB.user_id == current_user.id,
+    ).first()
+    if not notif:
+        raise HTTPException(status_code=404, detail="Notification not found")
+    db.delete(notif)
+    db.commit()
+    return {"message": "Deleted"}
 

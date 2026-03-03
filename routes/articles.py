@@ -1,10 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List, Optional
+from datetime import datetime, timezone
 import logging
 
 from database import get_db
+from config import FRONTEND_URL
 from models.article import ArticleDB
+from models.enums import ArticleStatus
 from schemas.article import ArticleCreate, ArticleUpdate, ArticleResponse
 from utils.auth_helpers import get_current_user, is_admin
 from utils.db_helpers import (
@@ -125,13 +128,34 @@ def delete_existing_article(
     return {"detail": f"Article '{article.title}' deleted successfully"}
 
 # Share
-@router.get("/articles/{id}/share")
-def share_article(id: int, db: Session = Depends(get_db)):
-    article = db.query(ArticleDB).filter(ArticleDB.id == id).first()
+@router.get("/{article_id}/share")
+def share_article(article_id: int, db: Session = Depends(get_db)):
+    article = db.query(ArticleDB).filter(ArticleDB.id == article_id).first()
     if not article:
-        logger.warning(f"Article with ID {id} not found.")
+        logger.warning(f"Article with ID {article_id} not found.")
         raise HTTPException(status_code=404, detail="Article not found")
 
-    share_url = f"http://127.0.0.1:8000/articles/{id}"
-    logger.info(f"Generated share URL for article {id}: {share_url}")
+    share_url = f"{FRONTEND_URL}/posts/{article_id}"
+    logger.info(f"Generated share URL for article {article_id}: {share_url}")
     return {"share_url": share_url}
+
+@router.put("/{article_id}/publish")
+async def toggle_publish(
+    article_id: int,
+    current_user: UserDB = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    article = get_article_by_id(db, article_id)
+    if not article:
+        raise HTTPException(status_code=404, detail="Article not found")
+    if article.author_id != current_user.id and not is_admin(current_user):
+        raise HTTPException(status_code=403, detail="Not authorized")
+    if article.status == ArticleStatus.PUBLISHED:
+        article.status = ArticleStatus.DRAFT
+        article.published_date = None
+    else:
+        article.status = ArticleStatus.PUBLISHED
+        article.published_date = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(article)
+    return {"status": article.status, "published_date": article.published_date}

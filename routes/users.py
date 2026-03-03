@@ -1,5 +1,6 @@
 import logging
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+import os
+from fastapi import APIRouter, Depends, HTTPException, status, Request, UploadFile, File
 from sqlalchemy.orm import Session
 from fastapi.security import OAuth2PasswordRequestForm
 from datetime import timedelta
@@ -7,15 +8,15 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 from database import get_db
-from schemas.user import UserCreate, UserResponse
+from schemas.user import UserCreate, UserResponse, UserProfileUpdate, UserPasswordChange, UserPublicProfile
 from utils.auth_helpers import (
-    create_access_token, get_current_user, hash_password,
+    create_access_token, get_current_user, hash_password, verify_password,
     verify_user_credentials, create_refresh_token, verify_refresh_token
 )
-from utils.db_helpers import create_new_user
+from utils.db_helpers import create_new_user, get_user_by_username, update_user_profile
 from models.user import UserDB, UserRole
 from models.refresh_token import RefreshTokenDB
-from config import ACCESS_TOKEN_EXPIRE_MINUTES, REFRESH_TOKEN_EXPIRE_DAYS
+from config import ACCESS_TOKEN_EXPIRE_MINUTES, REFRESH_TOKEN_EXPIRE_DAYS, UPLOAD_FOLDER
 
 logger = logging.getLogger(__name__)
 
@@ -23,14 +24,14 @@ router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
 
 @router.post("/register", response_model=UserResponse)
-def register_user(user: UserCreate, db: Session = Depends(get_db)):
+@limiter.limit("5/hour")
+def register_user(request: Request, user: UserCreate, db: Session = Depends(get_db)):
     """Register a new user."""
     existing_user = db.query(UserDB).filter(UserDB.email == user.email).first()
     if existing_user:
         logger.warning(f"Registration attempt with existing email: {user.email}")
         raise HTTPException(status_code=400, detail="Email already registered")
 
-    hashed_pw = hash_password(user.password)
     new_user = create_new_user(db, user, role=UserRole.READER)
 
     logger.info(f"New user registered: {new_user.username} ({new_user.email})")
@@ -102,3 +103,69 @@ def logout_user(
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Logout failed: {str(e)}")
+
+@router.get("/me", response_model=UserResponse)
+async def get_my_profile(current_user: UserDB = Depends(get_current_user)):
+    return current_user
+
+@router.put("/me", response_model=UserResponse)
+async def update_my_profile(
+    data: UserProfileUpdate,
+    current_user: UserDB = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if data.username and data.username != current_user.username:
+        existing = get_user_by_username(db, data.username)
+        if existing:
+            raise HTTPException(status_code=409, detail="Username already taken")
+    if data.email and data.email != current_user.email:
+        existing_email = db.query(UserDB).filter(UserDB.email == data.email).first()
+        if existing_email:
+            raise HTTPException(status_code=409, detail="Email already in use")
+    updated = update_user_profile(db, current_user, data.model_dump(exclude_none=True))
+    return updated
+
+@router.put("/me/password")
+async def change_password(
+    data: UserPasswordChange,
+    current_user: UserDB = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if not verify_password(data.current_password, current_user.hashed_password):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+    current_user.hashed_password = hash_password(data.new_password)
+    db.commit()
+    return {"message": "Password updated successfully"}
+
+@router.post("/me/avatar", response_model=UserResponse)
+async def upload_avatar(
+    file: UploadFile = File(...),
+    current_user: UserDB = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    allowed = {"image/jpeg", "image/png", "image/webp", "image/gif"}
+    if file.content_type not in allowed:
+        raise HTTPException(status_code=400, detail="Only image files are allowed for avatars")
+    safe_name = os.path.basename(file.filename or "upload")
+    filename = f"avatar_{current_user.id}_{safe_name}"
+    path = os.path.join(UPLOAD_FOLDER, filename)
+    if not os.path.abspath(path).startswith(os.path.abspath(UPLOAD_FOLDER)):
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    MAX_AVATAR_SIZE = 10 * 1024 * 1024  # 10MB
+    contents = await file.read()
+    if len(contents) > MAX_AVATAR_SIZE:
+        raise HTTPException(status_code=413, detail="File too large. Maximum size is 10MB.")
+    with open(path, "wb") as f:
+        f.write(contents)
+    avatar_url = f"/media/{filename}"
+    current_user.avatar_url = avatar_url
+    db.commit()
+    db.refresh(current_user)
+    return current_user
+
+@router.get("/{username}/profile", response_model=UserPublicProfile)
+async def get_public_profile(username: str, db: Session = Depends(get_db)):
+    user = get_user_by_username(db, username)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user

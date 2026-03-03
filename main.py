@@ -5,10 +5,13 @@ from models import *  # Ensure all models are imported before creating tables
 from routes import likes, users, articles, comments, admin, media, notifications
 from slowapi.middleware import SlowAPIMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.cors import CORSMiddleware
+from starlette.requests import Request as StarletteRequest
 from starlette.responses import JSONResponse
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
+from config import FRONTEND_URL
 
 # --- Logging Configuration ---
 logging.basicConfig(
@@ -24,17 +27,30 @@ app = FastAPI(title="Personal Blogging Platform API")
 limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])
 app.state.limiter = limiter
 
-# --- Middleware Setup ---
-app.add_middleware(TrustedHostMiddleware, allowed_hosts=["yourdomain.com", "127.0.0.1"])
-app.add_middleware(SlowAPIMiddleware)
+# --- Security Headers Middleware ---
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: StarletteRequest, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        return response
 
-# Optional: Enable CORS if frontend needs access
+# --- Middleware Setup ---
+# Starlette applies middleware in LIFO order — last registered is outermost (first to execute).
+# Execution order: TrustedHostMiddleware → SlowAPIMiddleware → SecurityHeadersMiddleware → CORSMiddleware → route
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:5500/", "*"],
+    allow_origins=[FRONTEND_URL],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+)
+app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(SlowAPIMiddleware)
+app.add_middleware(
+    TrustedHostMiddleware,
+    allowed_hosts=["yourdomain.com", "127.0.0.1"]
 )
 
 # --- Database Initialization ---

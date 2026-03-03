@@ -1,5 +1,6 @@
 import os
 import logging
+import warnings
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
@@ -43,10 +44,17 @@ ALGORITHM = "HS256"
 
 # Upload Configuration
 UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", os.path.abspath("uploads"))
+FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
 try:
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
     logger.info(f"Upload folder set to: {UPLOAD_FOLDER}")
 except Exception as e:
     logger.error(f"Error creating upload folder at {UPLOAD_FOLDER}: {e}")
     raise
+
+if len(SECRET_KEY) < 32:
+    warnings.warn(
+        "SECRET_KEY is shorter than 32 characters. Use a strong random key in production.",
+        stacklevel=2,
+    )
 

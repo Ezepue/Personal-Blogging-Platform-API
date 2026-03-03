@@ -115,6 +115,18 @@ def delete_user_from_db(db: Session, user_id: int):
     logger.info(f"User {user.username} and associated content soft deleted.")
 
 
+def get_user_by_username(db: Session, username: str):
+    return db.query(UserDB).filter(UserDB.username == username).first()
+
+def update_user_profile(db: Session, user: UserDB, data: dict) -> UserDB:
+    ALLOWED_FIELDS = {"username", "email", "bio"}
+    for key, value in data.items():
+        if key in ALLOWED_FIELDS and value is not None:
+            setattr(user, key, value)
+    db.commit()
+    db.refresh(user)
+    return user
+
 def get_all_users(db: Session) -> List[UserDB]:
     """Fetch all users from the database."""
     try:
@@ -317,7 +329,7 @@ def delete_comment(db: Session, comment_id: int, user: UserDB, allow_admin: bool
         raise HTTPException(status_code=404, detail="Comment not found")
 
     # Check if user has permission to delete
-    if comment.user_id == user.id or (allow_admin and user.role in {UserRole.admin, UserRole.super_admin}):
+    if comment.user_id == user.id or (allow_admin and user.role in {UserRole.ADMIN, UserRole.SUPER_ADMIN}):
         db.delete(comment)
         db.commit()
         logger.info(f"Comment {comment_id} deleted by user {user.id}.")
