@@ -17,20 +17,28 @@ type Profile = {
 };
 
 async function getProfile(username: string): Promise<Profile | null> {
-  const res = await fetch(`${API_URL}/users/${username}/profile`, {
-    cache: "no-store",
-  });
-  if (!res.ok) return null;
-  return res.json();
+  try {
+    const res = await fetch(`${API_URL}/users/${username}/profile`, {
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function getUserPosts(username: string): Promise<any[]> {
-  const res = await fetch(`${API_URL}/users/${username}/articles?limit=100`, {
-    cache: "no-store",
-  });
-  if (!res.ok) return [];
-  return res.json();
+  try {
+    const res = await fetch(`${API_URL}/users/${username}/articles?limit=100`, {
+      cache: "no-store",
+    });
+    if (!res.ok) return [];
+    return res.json();
+  } catch {
+    return [];
+  }
 }
 
 export async function generateMetadata(
