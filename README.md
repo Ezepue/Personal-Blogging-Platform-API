@@ -70,6 +70,11 @@ API_URL=http://127.0.0.1:8000 npm run dev
 
 Frontend will be live at: **`http://localhost:3000`**
 
+> In production also set `SITE_URL` (the site's public origin, e.g.
+> `https://blog.example.com`) so OpenGraph/Twitter share images resolve to
+> absolute URLs, and `NEXT_PUBLIC_WS_URL` (e.g. `wss://api.example.com`) for
+> real-time notifications.
+
 ---
 
 ## 🔥 API Endpoints

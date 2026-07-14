@@ -9,6 +9,10 @@ import Footer from "@/components/Footer";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
+  // Absolute base for OG/Twitter images and canonical URLs. Set SITE_URL to the
+  // public origin in production (e.g. https://blog.example.com); crawlers ignore
+  // relative image URLs, so without this share previews would break.
+  metadataBase: new URL(process.env.SITE_URL ?? "http://localhost:3000"),
   title: {
     default: "Quill — stories worth reading",
     template: "%s — Quill",
