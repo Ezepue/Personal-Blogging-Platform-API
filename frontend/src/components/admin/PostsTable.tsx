@@ -84,8 +84,8 @@ export default function PostsTable() {
             </tr>
           ) : (
             posts.map((p) => (
-              <tr key={p.id} className="border-b border-border/50 hover:bg-hover transition-colors">
-                <td className="py-3 pr-4 text-[#f1f1f5] max-w-xs">
+              <tr key={p.id} className="border-b border-border hover:bg-hover transition-colors">
+                <td className="py-3 pr-4 text-ink max-w-xs">
                   <Link href={`/posts/${p.id}`} className="hover:text-accent transition-colors truncate block">
                     {p.title}
                   </Link>

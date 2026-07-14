@@ -1,6 +1,8 @@
 import re
-from sqlalchemy import Column, Integer, String, Enum, Index, Text, Boolean
+from datetime import datetime
+from sqlalchemy import Column, Integer, String, Enum, Index, Text, Boolean, DateTime
 from sqlalchemy.orm import relationship, validates
+from sqlalchemy.sql import func
 from database import Base
 from .enums import UserRole
 
@@ -15,6 +17,18 @@ class UserDB(Base):
     bio = Column(Text, nullable=True)
     avatar_url = Column(String(500), nullable=True)
     is_active = Column(Boolean, default=True, nullable=False, server_default="true")
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, server_default=func.now())
+
+    # Public profile extras
+    website = Column(String(300), nullable=True)
+    location = Column(String(120), nullable=True)
+    twitter = Column(String(80), nullable=True)
+    github = Column(String(80), nullable=True)
+
+    # Notification preferences — which events generate a notification for this user.
+    notify_likes = Column(Boolean, default=True, nullable=False, server_default="true")
+    notify_comments = Column(Boolean, default=True, nullable=False, server_default="true")
+    notify_follows = Column(Boolean, default=True, nullable=False, server_default="true")
 
     # Composite index for faster lookups
     __table_args__ = (

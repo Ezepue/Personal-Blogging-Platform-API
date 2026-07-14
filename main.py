@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from database import Base, engine
 from models import *  # Ensure all models are imported before creating tables
-from routes import likes, users, articles, comments, admin, media, notifications
+from routes import likes, users, articles, comments, admin, media, notifications, bookmarks, dashboard, feeds
 from slowapi.middleware import SlowAPIMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -79,6 +79,9 @@ app.include_router(comments.router, prefix="/comments", tags=["Comments"])
 app.include_router(notifications.router, prefix="/notification", tags=["Notifications"])
 app.include_router(media.router, prefix="/media", tags=["Media"])
 app.include_router(admin.router, prefix="/admin", tags=["Admin"])
+app.include_router(bookmarks.router, prefix="/bookmarks", tags=["Bookmarks"])
+app.include_router(dashboard.router, prefix="/dashboard", tags=["Dashboard"])
+app.include_router(feeds.router, tags=["Feeds"])
 
 # --- Custom 404 Error Handler ---
 @app.exception_handler(404)

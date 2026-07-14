@@ -15,6 +15,7 @@ from schemas.comment import CommentCreate
 from typing import List, Optional
 from utils.auth_helpers import hash_password
 from utils.sanitize import sanitize_html
+from utils.text import unique_slug, reading_time_minutes
 
 # Logger Setup (Fixed Order)
 logging.basicConfig(level=logging.INFO)
@@ -120,7 +121,7 @@ def get_user_by_username(db: Session, username: str):
     return db.query(UserDB).filter(UserDB.username == username).first()
 
 def update_user_profile(db: Session, user: UserDB, data: dict) -> UserDB:
-    ALLOWED_FIELDS = {"username", "email", "bio"}
+    ALLOWED_FIELDS = {"username", "email", "bio", "website", "location", "twitter", "github"}
     for key, value in data.items():
         if key in ALLOWED_FIELDS and value is not None:
             setattr(user, key, value)
@@ -146,14 +147,19 @@ def create_new_article(db: Session, article_data: ArticleCreate, author_id: int)
         if article_data.status == ArticleStatus.PUBLISHED
         else None
     )
+    content = sanitize_html(article_data.content)
     new_article = ArticleDB(
         title=article_data.title,
-        content=sanitize_html(article_data.content),
+        subtitle=article_data.subtitle,
+        slug=unique_slug(db, article_data.title),
+        content=content,
         category=article_data.category,
+        cover_image_url=article_data.cover_image_url,
         tags=article_data.tags or [],
         author_id=author_id,
         status=article_data.status,
         published_date=published_date,
+        reading_time_minutes=reading_time_minutes(content),
     )
     db.add(new_article)
     db.commit()
@@ -165,11 +171,17 @@ def get_articles(
     db: Session,
     search: str = None,
     category: str = None,
+    tag: str = None,
     skip: int = 0,
     limit: int = 10,
     status: ArticleStatus = ArticleStatus.PUBLISHED,
+    sort: str = "latest",
 ):
-    """Fetch articles based on search, category, and status filters."""
+    """Fetch articles with search / category / tag filters and sorting.
+
+    sort: "latest" (default, newest first), "trending" (most viewed),
+    or "top" (most liked).
+    """
     query = db.query(ArticleDB)
 
     # Filter by status (defaults to PUBLISHED for public feeds)
@@ -181,6 +193,7 @@ def get_articles(
     if search:
         query = query.filter(or_(
             ArticleDB.title.icontains(search, autoescape=True),
+            ArticleDB.subtitle.icontains(search, autoescape=True),
             ArticleDB.content.icontains(search, autoescape=True),
         ))
 
@@ -188,7 +201,18 @@ def get_articles(
     if category:
         query = query.filter(func.lower(ArticleDB.category) == func.lower(category))
 
-    return query.order_by(ArticleDB.id.desc()).offset(skip).limit(limit).all()
+    # Tag filter against the JSONB tags array
+    if tag:
+        query = query.filter(ArticleDB.tags.contains([tag]))
+
+    if sort == "trending":
+        order = (ArticleDB.views_count.desc(), ArticleDB.id.desc())
+    elif sort == "top":
+        order = (ArticleDB.likes_count.desc(), ArticleDB.id.desc())
+    else:
+        order = (ArticleDB.id.desc(),)
+
+    return query.order_by(*order).offset(skip).limit(limit).all()
 
 
 def get_user_drafts(db: Session, author_id: int, skip: int = 0, limit: int = 50):
@@ -226,9 +250,14 @@ def update_article(db: Session, article_id: int, article_data: ArticleUpdate) ->
     data = article_data.model_dump(exclude_unset=True)
     if "content" in data and data["content"] is not None:
         data["content"] = sanitize_html(data["content"])
+        article.reading_time_minutes = reading_time_minutes(data["content"])
 
     for key, value in data.items():
         setattr(article, key, value)
+
+    # Refresh the slug when the title changes (keeps URLs meaningful).
+    if "title" in data and data["title"]:
+        article.slug = unique_slug(db, data["title"])
 
     # Keep published_date consistent with any status change.
     if "status" in data:
@@ -272,11 +301,12 @@ def get_article_with_likes(db: Session, article_id: int):
 # Comment operations
 
 def create_new_comment(db: Session, comment_data: CommentCreate, author_id: int):
-    """Create a new comment for an article."""
+    """Create a new comment (or threaded reply) for an article."""
     new_comment = CommentDB(
         article_id=comment_data.article_id,
         content=comment_data.content,
-        user_id=author_id
+        user_id=author_id,
+        parent_id=comment_data.parent_id,
     )
     db.add(new_comment)
     db.commit()

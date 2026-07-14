@@ -97,7 +97,7 @@ export default function DraftsPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-[#f1f1f5]">My Drafts</h1>
+          <h1 className="text-3xl font-bold text-ink">My Drafts</h1>
           <p className="text-muted text-sm mt-1">
             {drafts.length} {drafts.length === 1 ? "draft" : "drafts"}
           </p>
@@ -136,11 +136,11 @@ export default function DraftsPage() {
           {drafts.map((draft) => (
             <article
               key={draft.id}
-              className="bg-surface border border-border rounded-xl p-5 hover:border-accent/50 transition-colors"
+              className="bg-surface border border-border rounded-xl p-5 hover:border-accent transition-colors"
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0 flex-1">
-                  <h2 className="font-semibold text-[#f1f1f5] truncate text-lg">
+                  <h2 className="font-semibold text-ink truncate text-lg">
                     {draft.title}
                   </h2>
                   <p className="text-muted text-sm mt-1 line-clamp-2 leading-relaxed">
@@ -160,7 +160,7 @@ export default function DraftsPage() {
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <Link
                     href={`/write/${draft.id}`}
-                    className="px-3 py-1.5 text-xs border border-border rounded-lg text-muted hover:text-[#f1f1f5] hover:border-[#f1f1f5] transition-colors"
+                    className="px-3 py-1.5 text-xs border border-border rounded-lg text-muted hover:text-ink hover:border-[#f1f1f5] transition-colors"
                   >
                     Edit
                   </Link>

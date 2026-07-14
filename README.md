@@ -1,21 +1,17 @@
-# Personal Blogging Platform API
+# Quill — Personal Blogging Platform
 
-A simple, yet powerful, **FastAPI-based** blogging platform that allows users to create, read, update, and delete articles. The API supports user authentication, article management, and database persistence using **PostgreSQL** and **SQLAlchemy**.
+A full-stack blogging platform: a **FastAPI + PostgreSQL** backend and a **Next.js 14** frontend with an editorial, magazine-style design (paper/ink light & dark themes).
 
 ---
 
 ## 🚀 Features
-- **User Authentication** (Signup, Login with JWT, Logout)
-- **CRUD Operations for Articles**
-- **PostgreSQL Database with SQLAlchemy ORM**
-- **Alembic Migrations**
-- **FastAPI with Automatic API Documentation (Swagger UI & Redoc)**
-- **Role-Based Access Control (Admin, Super Admin)**
-- **Likes & Comments System**
-- **Search & Filtering for Articles**
-- **Draft vs Published Articles**
-- **Media Uploads** (Images/Files)
-- **Notification System (Work in Progress)**
+- **Auth & accounts** — JWT access tokens + DB-backed refresh tokens, httpOnly cookies, role-based access control (Reader, Author, Admin, Super Admin), notification preferences
+- **Writing** — rich-text editor, drafts vs published, subtitles, cover images, tags & categories, SEO-friendly slugs, auto reading-time estimates
+- **Reading** — trending/top/latest feeds, personalized Following feed, related posts, auto table of contents, reading progress bar, view counts
+- **Community** — follow authors, threaded comments with editing and likes, article likes, bookmarks/reading list, typed real-time notifications (WebSocket)
+- **Discovery** — site-wide search (stories + writers), topic browse pages, RSS feed, sitemap, OpenGraph metadata
+- **Author tools** — dashboard with per-story analytics (views/likes/comments), profile pages with socials and follower stats
+- **Platform** — sanitized article HTML (stored-XSS safe), magic-byte upload validation, rate limiting, Alembic migrations, Swagger/ReDoc docs
 
 ---
 
@@ -60,10 +56,19 @@ alembic upgrade head
 
 ### 6️⃣ Start the API Server
 ```bash
-uvicorn app:app --reload
+uvicorn main:app --reload
 ```
 
 API will be live at: **`http://127.0.0.1:8000`**
+
+### 7️⃣ Start the Frontend
+```bash
+cd frontend
+npm install
+API_URL=http://127.0.0.1:8000 npm run dev
+```
+
+Frontend will be live at: **`http://localhost:3000`**
 
 ---
 

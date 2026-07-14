@@ -1,6 +1,8 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
 from sqlalchemy.orm import Session
+from typing import List
 from models.notification import NotificationDB
+from schemas.notification import NotificationResponse
 from utils.notification_helper import fetch_unread_notifications, serialize_notification
 from websocket_manager import websocket_manager
 from database import get_db
@@ -53,7 +55,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: int, token: str = Qu
     except WebSocketDisconnect:
         await websocket_manager.disconnect(user_id)
 
-@router.get("/unread", response_model=list)
+@router.get("/unread", response_model=List[NotificationResponse])
 def get_unread_notifications(
     db: Session = Depends(get_db),
     current_user: UserDB = Depends(get_current_user),
@@ -62,6 +64,25 @@ def get_unread_notifications(
 ):
     """Fetch unread notifications for the current user."""
     return fetch_unread_notifications(db, current_user.id, skip, limit)
+
+
+@router.get("/", response_model=List[NotificationResponse])
+def get_all_notifications(
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user),
+    skip: int = 0,
+    limit: int = 30,
+):
+    """Fetch all notifications (read and unread), newest first."""
+    limit = min(100, max(1, limit))
+    return (
+        db.query(NotificationDB)
+        .filter(NotificationDB.user_id == current_user.id)
+        .order_by(NotificationDB.created_at.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
 
 @router.post("/read/{notification_id}")
 async def mark_read(

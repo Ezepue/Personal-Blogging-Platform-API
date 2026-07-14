@@ -68,6 +68,8 @@ async def like_article(
                 db=db,
                 user_id=article.author_id,
                 message=f"{user.username} liked your article \"{article.title}\"",
+                notif_type="like",
+                extra_data={"article_id": article.id},
             )
         except Exception:
             pass  # notification failure must not fail the like operation

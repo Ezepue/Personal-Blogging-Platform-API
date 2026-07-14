@@ -20,10 +20,29 @@ def serialize_notification(notification: NotificationDB) -> dict:
         "id": notification.id,
         "user_id": notification.user_id,
         "message": notification.message,
+        "type": notification.type,
         "is_read": notification.is_read,
         "extra_data": notification.extra_data,
         "created_at": notification.created_at.isoformat() if notification.created_at else None,
     }
+
+
+# Maps a notification type to the user preference column that gates it.
+_PREF_FOR_TYPE = {
+    "like": "notify_likes",
+    "comment": "notify_comments",
+    "follow": "notify_follows",
+}
+
+
+def _recipient_allows(db: Session, user_id: int, notif_type: str) -> bool:
+    """Check the recipient's notification preferences for this event type."""
+    pref_field = _PREF_FOR_TYPE.get(notif_type)
+    if pref_field is None:
+        return True  # system/mention notifications are always delivered
+    from models.user import UserDB
+    user = db.query(UserDB).filter(UserDB.id == user_id).first()
+    return bool(user and getattr(user, pref_field, True))
 
 def create_notification(db: Session, user_id: int, message: str):
     """Create a notification for a user."""
@@ -59,15 +78,30 @@ def mark_notifications_as_read(db: Session, user_id: int, notification_ids: list
     db.commit()
     return {"message": "Notifications marked as read successfully."}
 
-async def send_notification_to_user(db: Session, user_id: int, message: str, websocket: WebSocket = None):
+async def send_notification_to_user(
+    db: Session,
+    user_id: int,
+    message: str,
+    websocket: WebSocket = None,
+    notif_type: str = "system",
+    extra_data: dict = None,
+):
     """
     Sends a notification to a user asynchronously.
+    - Respects the recipient's notification preferences (per event type).
     - Stores the notification in the database.
     - Sends a real-time notification via WebSockets if available.
     """
     try:
+        if not _recipient_allows(db, user_id, notif_type):
+            logger.info(f"Notification of type '{notif_type}' suppressed by user {user_id}'s preferences")
+            return None
+
         # Store notification in DB
-        new_notification = NotificationDB(user_id=user_id, message=message, is_read=False)
+        new_notification = NotificationDB(
+            user_id=user_id, message=message, is_read=False,
+            type=notif_type, extra_data=extra_data,
+        )
         db.add(new_notification)
         db.commit()
         db.refresh(new_notification)

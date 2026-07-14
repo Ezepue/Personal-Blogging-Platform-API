@@ -89,7 +89,7 @@ export default function AdminPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-[#f1f1f5] mb-6">Admin Dashboard</h1>
+      <h1 className="text-2xl font-bold text-ink mb-6">Admin Dashboard</h1>
 
       {/* Stats bar */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
@@ -110,7 +110,7 @@ export default function AdminPage() {
             key={t}
             onClick={() => setTab(t)}
             className={`px-4 py-2 rounded-md text-sm font-medium capitalize transition-colors ${
-              tab === t ? "bg-accent text-white" : "text-muted hover:text-[#f1f1f5]"
+              tab === t ? "bg-accent text-white" : "text-muted hover:text-ink"
             }`}
           >
             {t}

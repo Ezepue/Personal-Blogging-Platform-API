@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 type Notification = {
   id: number;
   message: string;
+  type?: string;
   is_read: boolean;
   created_at: string;
   extra_data?: Record<string, unknown>;

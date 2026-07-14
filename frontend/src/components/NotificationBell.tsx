@@ -37,7 +37,7 @@ export default function NotificationBell() {
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen((o) => !o)}
-        className="relative text-muted hover:text-[#f1f1f5] transition-colors"
+        className="relative text-muted hover:text-ink transition-colors"
         aria-label="Notifications"
       >
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -58,7 +58,7 @@ export default function NotificationBell() {
       {open && (
         <div className="absolute right-0 top-8 w-80 bg-surface border border-border rounded-xl shadow-xl z-50 overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-            <span className="font-semibold text-[#f1f1f5] text-sm">Notifications</span>
+            <span className="font-semibold text-ink text-sm">Notifications</span>
             <div className="flex items-center gap-3">
               {unreadCount > 0 && (
                 <button
@@ -70,7 +70,7 @@ export default function NotificationBell() {
               )}
               <button
                 onClick={() => { setOpen(false); router.push("/notifications"); }}
-                className="text-xs text-muted hover:text-[#f1f1f5]"
+                className="text-xs text-muted hover:text-ink"
               >
                 See all
               </button>
@@ -85,8 +85,8 @@ export default function NotificationBell() {
                 <button
                   key={n.id}
                   onClick={() => handleClick(n)}
-                  className={`w-full text-left px-4 py-3 hover:bg-hover transition-colors border-b border-border/50 last:border-0 ${
-                    !n.is_read ? "bg-accent/5" : ""
+                  className={`w-full text-left px-4 py-3 hover:bg-hover transition-colors border-b border-border last:border-0 ${
+                    !n.is_read ? "bg-accent-soft" : ""
                   }`}
                 >
                   <div className="flex items-start gap-2">
@@ -94,7 +94,7 @@ export default function NotificationBell() {
                       <span className="w-2 h-2 rounded-full bg-accent flex-shrink-0 mt-1.5" />
                     )}
                     <div className={!n.is_read ? "" : "ml-4"}>
-                      <p className="text-sm text-[#f1f1f5] leading-relaxed">{n.message}</p>
+                      <p className="text-sm text-ink leading-relaxed">{n.message}</p>
                       <p className="text-xs text-muted mt-0.5">
                         {new Date(n.created_at).toLocaleDateString()}
                       </p>

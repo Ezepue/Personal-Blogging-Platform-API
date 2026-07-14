@@ -82,8 +82,8 @@ export default function CommentsTable() {
             </tr>
           ) : (
             comments.map((c) => (
-              <tr key={c.id} className="border-b border-border/50 hover:bg-hover transition-colors">
-                <td className="py-3 pr-4 text-[#f1f1f5] max-w-xs">
+              <tr key={c.id} className="border-b border-border hover:bg-hover transition-colors">
+                <td className="py-3 pr-4 text-ink max-w-xs">
                   <span className="truncate block">{c.content}</span>
                 </td>
                 <td className="py-3 pr-4 text-muted">{c.user?.username ?? "—"}</td>

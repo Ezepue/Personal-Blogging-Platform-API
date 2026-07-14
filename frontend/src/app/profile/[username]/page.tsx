@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import ProfileDraftsTab from "@/components/ProfileDraftsTab";
+import FollowButton from "@/components/FollowButton";
 import type { Metadata } from "next";
 
 const API_URL = process.env.API_URL ?? "http://localhost:8000";
@@ -10,6 +11,14 @@ type Profile = {
   bio: string | null;
   avatar_url: string | null;
   role: string;
+  website?: string | null;
+  location?: string | null;
+  twitter?: string | null;
+  github?: string | null;
+  created_at?: string | null;
+  followers_count: number;
+  following_count: number;
+  articles_count: number;
 };
 
 async function getProfile(username: string): Promise<Profile | null> {
@@ -29,106 +38,110 @@ async function getUserPosts(username: string): Promise<any[]> {
   return res.json();
 }
 
-export async function generateMetadata(
-  { params }: { params: Promise<{ username: string }> }
-): Promise<Metadata> {
-  const { username } = await params;
-  const profile = await getProfile(username);
+export async function generateMetadata({
+  params,
+}: {
+  params: { username: string };
+}): Promise<Metadata> {
+  const profile = await getProfile(params.username);
   if (!profile) return { title: "Profile not found" };
   return {
-    title: `${profile.username} — Quill`,
-    description: profile.bio ?? `Posts by ${profile.username}`,
+    title: profile.username,
+    description: profile.bio ?? `Stories by ${profile.username}`,
   };
 }
 
-const roleBadge: Record<string, string> = {
-  SUPER_ADMIN: "bg-red-900/50 text-red-300",
-  ADMIN: "bg-orange-900/50 text-orange-300",
-  AUTHOR: "bg-violet-900/50 text-violet-300",
-  READER: "bg-gray-800 text-gray-300",
-};
-
-export default async function ProfilePage(
-  { params }: { params: Promise<{ username: string }> }
-) {
-  const { username } = await params;
-
-  const [profile, posts] = await Promise.all([
-    getProfile(username),
-    getUserPosts(username),
-  ]);
-
+export default async function ProfilePage({
+  params,
+}: {
+  params: { username: string };
+}) {
+  const { username } = params;
+  const [profile, posts] = await Promise.all([getProfile(username), getUserPosts(username)]);
   if (!profile) notFound();
 
-  const badgeClass = roleBadge[profile.role] ?? "bg-gray-800 text-gray-300";
+  const joined = profile.created_at
+    ? new Date(profile.created_at).toLocaleDateString("en-US", { month: "long", year: "numeric" })
+    : null;
 
-  // Stats derived from posts
-  const totalLikes = posts.reduce(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (sum: number, p: any) => sum + (p.likes_count ?? 0),
-    0
-  );
-  const categories = Array.from(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    new Set(posts.map((p: any) => p.category).filter(Boolean))
-  ).length;
+  const links = [
+    profile.website && {
+      href: profile.website.startsWith("http") ? profile.website : `https://${profile.website}`,
+      label: profile.website.replace(/^https?:\/\//, ""),
+    },
+    profile.twitter && { href: `https://x.com/${profile.twitter}`, label: `@${profile.twitter}` },
+    profile.github && { href: `https://github.com/${profile.github}`, label: `github/${profile.github}` },
+  ].filter(Boolean) as { href: string; label: string }[];
 
   return (
     <div className="max-w-3xl mx-auto">
-      {/* Profile card */}
-      <div className="bg-surface border border-border rounded-xl p-8 mb-8">
-        <div className="flex gap-6 items-start mb-6">
-          {/* Avatar */}
-          <div className="w-20 h-20 rounded-full bg-accent/20 flex items-center justify-center text-3xl font-bold text-accent flex-shrink-0 overflow-hidden">
+      {/* Banner */}
+      <div className="relative h-36 sm:h-44 -mx-4 sm:mx-0 sm:rounded-3xl overflow-hidden mb-0 fade-up">
+        <div
+          className="absolute inset-0"
+          style={{
+            background:
+              "linear-gradient(120deg, var(--accent-soft), var(--accent2-soft) 55%, transparent), var(--raised)",
+          }}
+        />
+        <div className="art-field" aria-hidden />
+      </div>
+
+      {/* Profile header */}
+      <div className="relative px-2 sm:px-8 -mt-12 mb-10 fade-up fade-up-1">
+        <div className="flex items-end justify-between mb-4">
+          <div className="w-24 h-24 rounded-full border-4 border-base bg-accent-soft flex items-center justify-center text-4xl font-bold text-accent overflow-hidden shadow-soft">
             {profile.avatar_url ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={profile.avatar_url}
-                alt={profile.username}
-                className="w-full h-full object-cover"
-              />
+              <img src={profile.avatar_url} alt={profile.username} className="w-full h-full object-cover" />
             ) : (
               profile.username[0].toUpperCase()
             )}
           </div>
-
-          {/* Name + bio */}
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-3 mb-1 flex-wrap">
-              <h1 className="text-2xl font-bold text-[#f1f1f5]">{profile.username}</h1>
-              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${badgeClass}`}>
-                {profile.role}
-              </span>
-            </div>
-            {profile.bio && (
-              <p className="text-muted mt-1 leading-relaxed text-sm">{profile.bio}</p>
-            )}
-          </div>
+          <FollowButton username={profile.username} />
         </div>
 
-        {/* Stats row */}
-        <div className="grid grid-cols-3 gap-4 pt-5 border-t border-border">
-          <div className="text-center">
-            <p className="text-2xl font-bold text-[#f1f1f5]">{posts.length}</p>
-            <p className="text-xs text-muted mt-0.5">{posts.length === 1 ? "Post" : "Posts"}</p>
-          </div>
-          <div className="text-center border-x border-border">
-            <p className="text-2xl font-bold text-[#f1f1f5]">{totalLikes}</p>
-            <p className="text-xs text-muted mt-0.5">Likes</p>
-          </div>
-          <div className="text-center">
-            <p className="text-2xl font-bold text-[#f1f1f5]">{categories}</p>
-            <p className="text-xs text-muted mt-0.5">{categories === 1 ? "Category" : "Categories"}</p>
-          </div>
+        <h1 className="font-display text-4xl text-ink mb-1">{profile.username}</h1>
+        {profile.bio && <p className="text-ink-soft leading-relaxed max-w-xl mb-3">{profile.bio}</p>}
+
+        {/* Meta line: location, joined, links */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted mb-5">
+          {profile.location && <span>📍 {profile.location}</span>}
+          {joined && <span>Joined {joined}</span>}
+          {links.map((l) => (
+            <a
+              key={l.href}
+              href={l.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-accent hover:underline"
+            >
+              {l.label}
+            </a>
+          ))}
+        </div>
+
+        {/* Stats */}
+        <div className="flex items-center gap-6 text-sm">
+          <span className="text-ink font-semibold">
+            {profile.articles_count}
+            <span className="text-muted font-normal"> {profile.articles_count === 1 ? "story" : "stories"}</span>
+          </span>
+          <span className="text-ink font-semibold">
+            {profile.followers_count}
+            <span className="text-muted font-normal"> followers</span>
+          </span>
+          <span className="text-ink font-semibold">
+            {profile.following_count}
+            <span className="text-muted font-normal"> following</span>
+          </span>
         </div>
       </div>
 
-      {/* Tabs — ProfileDraftsTab is a client component that handles own-profile drafts tab */}
-      <ProfileDraftsTab
-        username={username}
-        posts={posts}
-        role={profile.role}
-      />
+      {/* Posts / drafts tabs */}
+      <div className="fade-up fade-up-2">
+        <ProfileDraftsTab username={username} posts={posts} role={profile.role} />
+      </div>
     </div>
   );
 }

@@ -29,7 +29,7 @@ export default function LoginPage() {
 
   return (
     <div className="max-w-sm mx-auto mt-16">
-      <h1 className="text-3xl font-bold text-[#f1f1f5] mb-8 text-center">
+      <h1 className="text-3xl font-bold text-ink mb-8 text-center">
         Sign in
       </h1>
 
@@ -45,7 +45,7 @@ export default function LoginPage() {
             onChange={(e) => setUsername(e.target.value)}
             required
             autoComplete="username"
-            className="w-full bg-surface border border-border rounded-lg px-4 py-2.5 text-[#f1f1f5] focus:outline-none focus:border-accent transition-colors"
+            className="w-full bg-surface border border-border rounded-lg px-4 py-2.5 text-ink focus:outline-none focus:border-accent transition-colors"
           />
         </div>
 
@@ -60,7 +60,7 @@ export default function LoginPage() {
             onChange={(e) => setPassword(e.target.value)}
             required
             autoComplete="current-password"
-            className="w-full bg-surface border border-border rounded-lg px-4 py-2.5 text-[#f1f1f5] focus:outline-none focus:border-accent transition-colors"
+            className="w-full bg-surface border border-border rounded-lg px-4 py-2.5 text-ink focus:outline-none focus:border-accent transition-colors"
           />
         </div>
 

@@ -112,8 +112,8 @@ export default function UsersTable({
             </tr>
           ) : (
             users.map((u) => (
-              <tr key={u.id} className="border-b border-border/50 hover:bg-hover transition-colors">
-                <td className="py-3 pr-4 text-[#f1f1f5]">{u.username}</td>
+              <tr key={u.id} className="border-b border-border hover:bg-hover transition-colors">
+                <td className="py-3 pr-4 text-ink">{u.username}</td>
                 <td className="py-3 pr-4 text-muted">{u.email}</td>
                 <td className="py-3 pr-4">
                   {isSuperAdmin && u.id !== currentUserId ? (
@@ -124,7 +124,7 @@ export default function UsersTable({
                         value={u.role}
                         disabled={changingRole === u.id}
                         onChange={(e) => changeRole(u.id, e.target.value)}
-                        className="bg-hover border border-border rounded px-2 py-1 text-[#f1f1f5] text-xs focus:outline-none focus:border-accent disabled:opacity-50"
+                        className="bg-hover border border-border rounded px-2 py-1 text-ink text-xs focus:outline-none focus:border-accent disabled:opacity-50"
                       >
                         {ASSIGNABLE_ROLES.map((r) => (
                           <option key={r} value={r}>{r}</option>
