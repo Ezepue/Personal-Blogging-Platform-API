@@ -12,8 +12,8 @@ import sqlalchemy as sa
 
 # Import the model metadata so we can materialize the full schema from the ORM
 # definitions. This keeps the initial migration in lockstep with the models.
-from database import Base
-import models  # noqa: F401  (populates Base.metadata)
+from app.db.base import Base
+import app.models  # noqa: F401
 
 
 # revision identifiers, used by Alembic.

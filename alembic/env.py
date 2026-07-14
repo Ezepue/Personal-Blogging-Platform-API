@@ -6,8 +6,9 @@ from alembic import context
 
 # Import your database Base and connection URL. Importing the models package
 # registers every table on Base.metadata so autogenerate and create_all see them.
-from database import Base, DATABASE_URL
-import models  # noqa: F401  (populates Base.metadata)
+from app.db.base import Base
+from app.core.config import DATABASE_URL
+import app.models  # noqa: F401  (populates Base.metadata)
 
 # Alembic Config object
 config = context.config
