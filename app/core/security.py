@@ -12,6 +12,7 @@ from fastapi import HTTPException, status
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from pydantic import SecretStr
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -42,8 +43,12 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 
 def verify_user_credentials(db: Session, username: str, password: str) -> Optional[UserDB]:
-    """Return the user when username/password match an active account."""
-    user = db.query(UserDB).filter(UserDB.username.ilike(username)).first()
+    """Return the user when username/password match an active account.
+
+    Uses exact (case-insensitive) matching on the lowercased username; ILIKE would
+    let %/_ wildcards in the submitted name match unrelated accounts.
+    """
+    user = db.query(UserDB).filter(func.lower(UserDB.username) == username.strip().lower()).first()
     if user and user.is_active and verify_password(password, user.hashed_password):
         return user
     return None

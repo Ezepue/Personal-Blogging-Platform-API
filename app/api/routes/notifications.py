@@ -19,8 +19,11 @@ logger = logging.getLogger(__name__)
 
 @router.websocket("/ws/{user_id}")
 async def websocket_endpoint(websocket: WebSocket, user_id: int, token: str = Query(...)):
-    """WebSocket endpoint authenticated by a short-lived ticket (or access token)."""
-    # Verify the token and confirm it belongs to the user_id in the path.
+    """WebSocket endpoint authenticated by a short-lived, single-purpose ws ticket.
+
+    Only ``token_type == "ws"`` is accepted; the long-lived access token is never
+    valid here, so it never needs to appear in a URL/query string.
+    """
     try:
         user_data = verify_access_token(token)
     except HTTPException:
@@ -28,7 +31,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: int, token: str = Qu
 
     valid = (
         user_data is not None
-        and user_data.get("token_type") in {"ws", "access"}
+        and user_data.get("token_type") == "ws"
         and str(user_data.get("sub")) == str(user_id)
     )
     if not valid:
@@ -53,7 +56,10 @@ async def websocket_endpoint(websocket: WebSocket, user_id: int, token: str = Qu
                 await websocket.send_text(f"Received unknown command: {data}")
 
     except WebSocketDisconnect:
-        await websocket_manager.disconnect(user_id)
+        await websocket_manager.disconnect(user_id, websocket)
+    except Exception:
+        logger.warning(f"WebSocket error for user {user_id}", exc_info=True)
+        await websocket_manager.disconnect(user_id, websocket)
 
 @router.get("/unread", response_model=List[NotificationResponse])
 def get_unread_notifications(
@@ -79,7 +85,7 @@ def get_all_notifications(
         db.query(NotificationDB)
         .filter(NotificationDB.user_id == current_user.id)
         .order_by(NotificationDB.created_at.desc())
-        .offset(skip)
+        .offset(max(0, skip))
         .limit(limit)
         .all()
     )

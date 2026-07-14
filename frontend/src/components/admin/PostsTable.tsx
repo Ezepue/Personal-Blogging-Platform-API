@@ -93,7 +93,7 @@ export default function PostsTable() {
                 <td className="py-3 pr-4 text-muted">{p.author?.username ?? "—"}</td>
                 <td className="py-3 pr-4">
                   <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                    p.status === "PUBLISHED"
+                    p.status?.toLowerCase() === "published"
                       ? "bg-green-900/50 text-green-300"
                       : "bg-gray-800 text-gray-400"
                   }`}>

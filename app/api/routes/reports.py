@@ -10,7 +10,7 @@ from app.db.session import get_db
 from app.models.report import ReportDB
 from app.models.user import UserDB
 from app.schemas.report import ReportCreate, ReportResponse
-from app.services import get_article_by_id, get_comment_by_id
+from app.services import get_article_by_id, get_comment_by_id, can_view_article
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +25,9 @@ def create_report(
 ):
     """File a report against a story or a comment."""
     if report.article_id is not None:
-        get_article_by_id(db, report.article_id)
+        article = get_article_by_id(db, report.article_id)
+        if not can_view_article(article, current_user):
+            raise HTTPException(status_code=404, detail="Article not found")
     if report.comment_id is not None:
         get_comment_by_id(db, report.comment_id)
 

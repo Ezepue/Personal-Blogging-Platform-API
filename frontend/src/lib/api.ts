@@ -8,6 +8,22 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Turn a FastAPI error body into a single human-readable string.
+ * `detail` may be a string (our HTTPExceptions) or an array of validation
+ * errors (422); rendering the array directly would crash React.
+ */
+export function errorMessage(data: unknown, fallback = "Something went wrong"): string {
+  if (typeof data === "string") return data;
+  const detail = (data as { detail?: unknown })?.detail;
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    const first = detail[0] as { msg?: string } | undefined;
+    if (first?.msg) return first.msg;
+  }
+  return fallback;
+}
+
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const init: RequestInit = { method };
   if (body !== undefined) {
@@ -18,8 +34,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   if (!res.ok) {
     let detail = `Request failed (${res.status})`;
     try {
-      const data = await res.json();
-      if (typeof data?.detail === "string") detail = data.detail;
+      detail = errorMessage(await res.json(), detail);
     } catch {
       /* non-JSON error body */
     }

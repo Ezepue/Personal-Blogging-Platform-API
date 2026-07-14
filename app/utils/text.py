@@ -16,15 +16,22 @@ def slugify(title: str, max_length: int = 80) -> str:
     return slug[:max_length].rstrip("-") or "post"
 
 
-def unique_slug(db: Session, title: str) -> str:
-    """Generate a slug unique across articles, suffixing a short token on collision."""
+def unique_slug(db: Session, title: str, exclude_id: int = None) -> str:
+    """Generate a slug unique across articles, suffixing a short token on collision.
+
+    ``exclude_id`` skips the article being updated so it never collides with itself.
+    """
     from app.models.article import ArticleDB  # local import to avoid a cycle
 
     base = slugify(title)
     slug = base
-    while db.query(ArticleDB.id).filter(ArticleDB.slug == slug).first() is not None:
+    while True:
+        query = db.query(ArticleDB.id).filter(ArticleDB.slug == slug)
+        if exclude_id is not None:
+            query = query.filter(ArticleDB.id != exclude_id)
+        if query.first() is None:
+            return slug
         slug = f"{base}-{secrets.token_hex(3)}"
-    return slug
 
 
 def strip_html(html: str) -> str:

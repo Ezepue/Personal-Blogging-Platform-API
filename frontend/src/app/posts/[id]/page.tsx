@@ -108,9 +108,13 @@ export default async function PostPage({
     wordCount: post.word_count || undefined,
   };
 
+  // Escape "<" so a title/subtitle containing "</script>" cannot break out of
+  // the JSON-LD script element (JSON.stringify does not escape it).
+  const jsonLdSafe = JSON.stringify(jsonLd).replace(/</g, "\\u003c");
+
   return (
     <>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdSafe }} />
       <ReadingProgress />
 
       <div className="xl:grid xl:grid-cols-[1fr_16rem] xl:gap-12">

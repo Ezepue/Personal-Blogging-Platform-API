@@ -10,8 +10,10 @@ from app.schemas.comment import CommentCreate, CommentUpdate, CommentResponse
 from app.api.deps import get_current_user, get_optional_user, is_admin
 from app.services import (
     create_new_comment, get_comments_by_article, get_comment_by_id, delete_comment,
-    get_article_by_id, extract_mentions,
+    get_article_by_id, extract_mentions, can_view_article as _can_view_article,
 )
+
+MAX_MENTIONS_PER_COMMENT = 10
 from app.services.notifications import send_notification_to_user
 from app.models.user import UserDB
 from app.models.article import ArticleDB
@@ -50,6 +52,9 @@ async def add_comment(
 ):
     """ Comment on an article, or reply to an existing comment via parent_id. """
     article = get_article_by_id(db, comment.article_id)
+    # Can't comment on something you can't see (another user's draft/deleted post).
+    if not _can_view_article(article, current_user):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Article not found")
 
     parent = None
     if comment.parent_id is not None:
@@ -84,9 +89,10 @@ async def add_comment(
     except Exception:
         pass  # notification failure must not fail the comment operation
 
-    # @mentions notify the named writers (never the comment's own author).
+    # @mentions notify the named writers (never the comment's own author), capped
+    # to prevent mass-notification spam from a single comment.
     try:
-        for mentioned in extract_mentions(db, new_comment.content, current_user.id):
+        for mentioned in extract_mentions(db, new_comment.content, current_user.id)[:MAX_MENTIONS_PER_COMMENT]:
             await send_notification_to_user(
                 db=db,
                 user_id=mentioned.id,

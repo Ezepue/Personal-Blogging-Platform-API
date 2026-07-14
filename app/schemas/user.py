@@ -1,3 +1,4 @@
+import re
 from typing import Optional
 from datetime import datetime
 from pydantic import BaseModel, SecretStr, EmailStr, Field, ConfigDict, field_validator
@@ -57,8 +58,14 @@ class UserProfileUpdate(BaseModel):
     @field_validator("username")
     @classmethod
     def validate_username(cls, v):
-        if v is not None and len(v) < 3:
-            raise ValueError("Username must be at least 3 characters")
+        # Mirror the ORM's rules here so bad input is a clean 422, not a 500 from
+        # the model validator downstream.
+        if v is None:
+            return v
+        if len(v) < 3 or len(v) > 30:
+            raise ValueError("Username must be 3-30 characters")
+        if not re.match(r"^[a-zA-Z0-9_]+$", v):
+            raise ValueError("Username can only contain letters, numbers, and underscores")
         return v
 
 class AccountDelete(BaseModel):

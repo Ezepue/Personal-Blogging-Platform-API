@@ -5,6 +5,7 @@ HTTP concerns and domain rules separate. The aggregate re-exports below give
 routers a single stable import surface.
 """
 from app.services.articles import (  # noqa: F401
+    can_view_article,
     create_new_article,
     delete_article,
     get_article_by_id,

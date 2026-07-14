@@ -21,7 +21,8 @@ from app.api.deps import (
 )
 from app.services import (
     create_new_article, get_article_by_id,
-    update_article, delete_article, get_articles, get_user_drafts
+    update_article, delete_article, get_articles, get_user_drafts,
+    can_view_article as _can_view_article,
 )
 
 logger = logging.getLogger(__name__)
@@ -29,15 +30,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 VALID_SORTS = {"latest", "trending", "top"}
-
-
-def _can_view_article(article: ArticleDB, user: Optional[UserDB]) -> bool:
-    """Published articles are public; drafts/deleted are visible only to the author or an admin."""
-    if article.status == ArticleStatus.PUBLISHED:
-        return True
-    if user is None:
-        return False
-    return article.author_id == user.id or is_admin(user)
 
 
 @router.post("", response_model=ArticleResponse)
@@ -106,7 +98,7 @@ def following_feed(
             ArticleDB.is_unlisted == False,
         )
         .order_by(ArticleDB.published_date.desc().nulls_last(), ArticleDB.id.desc())
-        .offset(skip)
+        .offset(max(0, skip))
         .limit(limit)
         .all()
     )
@@ -242,8 +234,12 @@ def _count_view(db: Session, article: ArticleDB, viewer: Optional[UserDB]) -> No
             else:
                 db.add(ViewHistoryDB(user_id=viewer.id, article_id=article.id))
         db.commit()
-        article.views_count = (article.views_count or 0) + 1
+        # Don't hand-increment: commit expired the instance, so serializing the
+        # response re-reads the already-incremented value from the DB. Adding 1
+        # here would double-count in the returned payload.
+        db.refresh(article)
     except Exception:
+        logger.warning(f"View counting failed for article {article.id}", exc_info=True)
         db.rollback()  # view counting must never break reads
 
 
@@ -335,8 +331,15 @@ def update_existing_article(
 ):
     """ Allow authors to update their own articles, and admins to edit any. """
     article = get_article_by_id(db, article_id)
-    if article.author_id != current_user.id and not is_admin(current_user):
+    admin = is_admin(current_user)
+    if article.author_id != current_user.id and not admin:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only edit your own articles")
+    # A moderation-deleted article is not editable by its author (only admins), and
+    # DELETED is an internal moderation state that authors may not set or clear.
+    if article.status == ArticleStatus.DELETED and not admin:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Article not found")
+    if article_data.status == ArticleStatus.DELETED and not admin:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid status")
 
     updated_article = update_article(db, article.id, article_data)
     logger.info(f"User {current_user.id} updated article '{article.title}' (ID: {article_id})")
@@ -380,8 +383,13 @@ async def toggle_publish(
     db: Session = Depends(get_db),
 ):
     article = get_article_by_id(db, article_id)
-    if article.author_id != current_user.id and not is_admin(current_user):
+    admin = is_admin(current_user)
+    if article.author_id != current_user.id and not admin:
         raise HTTPException(status_code=403, detail="Not authorized")
+    # Only DRAFT <-> PUBLISHED toggles; a moderation-deleted article can't be
+    # resurrected via publish (admins moderate through the admin routes).
+    if article.status == ArticleStatus.DELETED and not admin:
+        raise HTTPException(status_code=404, detail="Article not found")
     if article.status == ArticleStatus.PUBLISHED:
         article.status = ArticleStatus.DRAFT
         article.published_date = None

@@ -21,12 +21,22 @@ logger = logging.getLogger(__name__)
 UPLOAD_DIR = Path(UPLOAD_FOLDER)
 MAX_FILE_SIZE_MB = 10  # Maximum allowed file size in MB
 MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
-ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".pdf", ".mp4"}
-# Detected (magic-byte) MIME types we accept.
-ALLOWED_MIME_TYPES = {
-    "image/jpeg", "image/png", "image/gif", "image/webp",
-    "application/pdf", "video/mp4",
+ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".pdf", ".mp4"}
+# Detected (magic-byte) MIME type -> canonical extension. The stored extension is
+# always derived from the detected type, never from the client filename, so an
+# attacker cannot save an HTML/script payload under a ".html" name.
+MIME_TO_EXT = {
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/gif": ".gif",
+    "image/webp": ".webp",
+    "application/pdf": ".pdf",
+    "video/mp4": ".mp4",
 }
+ALLOWED_MIME_TYPES = set(MIME_TO_EXT)
+# Content types safe to render inline in the browser. Anything else is served as a
+# download so a mislabeled upload can never execute as HTML/script on our origin.
+INLINE_SAFE_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
 
 def ensure_upload_dir():
     """Ensure the upload directory exists before use."""
@@ -59,17 +69,17 @@ async def upload_file(
     """Handles secure media file uploads (Authenticated Users Only)."""
     ensure_upload_dir()
 
-    filename = get_unique_filename(file.filename)
-
     contents = await file.read()
     if len(contents) > MAX_FILE_SIZE_BYTES:
         raise HTTPException(status_code=413, detail=f"File size exceeds {MAX_FILE_SIZE_MB}MB limit")
 
-    # Trust the bytes, not the declared content-type/extension.
+    # Trust the bytes, not the declared content-type/extension; the stored name is
+    # a random uuid plus the extension implied by the detected type.
     detected = detect_file_type(contents)
     if detected not in ALLOWED_MIME_TYPES:
         raise HTTPException(status_code=400, detail="File content does not match an allowed type")
 
+    filename = f"{uuid.uuid4().hex}{MIME_TO_EXT[detected]}"
     file_location = UPLOAD_DIR / filename
     try:
         with file_location.open("wb") as buffer:
@@ -119,16 +129,25 @@ def delete_file(
 
 @router.get("/{filename}")
 def serve_file(filename: str):
-    """Serve an uploaded media file (public). Sent with an explicit content type;
-    combined with the app-wide X-Content-Type-Options: nosniff header this prevents
-    a mislabeled file from being interpreted as HTML/script by the browser."""
+    """Serve an uploaded media file (public).
+
+    Only known-safe image types are served inline; anything else is forced to a
+    download with a generic content type, so a mislabeled upload can never be
+    interpreted as HTML/script on our origin (regardless of its extension).
+    """
     file_path = validate_and_sanitize_filename(filename)
     if not file_path.exists() or not file_path.is_file():
         raise HTTPException(status_code=404, detail="File not found")
 
-    media_type, _ = mimetypes.guess_type(str(file_path))
+    guessed, _ = mimetypes.guess_type(str(file_path))
+    if guessed in INLINE_SAFE_TYPES:
+        media_type = guessed
+        disposition = "inline"
+    else:
+        media_type = "application/octet-stream"
+        disposition = "attachment"
     return FileResponse(
         path=str(file_path),
-        media_type=media_type or "application/octet-stream",
-        headers={"Content-Disposition": f'inline; filename="{file_path.name}"'},
+        media_type=media_type,
+        headers={"Content-Disposition": f'{disposition}; filename="{file_path.name}"'},
     )

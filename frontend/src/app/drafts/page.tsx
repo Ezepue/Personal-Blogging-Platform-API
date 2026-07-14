@@ -50,7 +50,6 @@ export default function DraftsPage() {
   useEffect(() => {
     if (loading) return;
     if (!user) { router.push("/login"); return; }
-    if (user.role === "READER") { router.push("/"); return; }
     fetchDrafts();
   }, [user, loading, router, fetchDrafts]);
 
@@ -90,7 +89,7 @@ export default function DraftsPage() {
     }
   };
 
-  if (loading || !user || user.role === "READER") return null;
+  if (loading || !user) return null;
 
   return (
     <div className="max-w-3xl mx-auto">

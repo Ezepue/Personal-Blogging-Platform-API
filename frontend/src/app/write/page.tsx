@@ -38,6 +38,7 @@ export default function WritePage() {
         setTags(d.tags ?? "");
         setCategory(d.category ?? "");
         setCoverUrl(d.coverUrl ?? "");
+        setUnlisted(Boolean(d.unlisted));
       } catch {
         // ignore malformed draft
       }
@@ -50,11 +51,11 @@ export default function WritePage() {
     const interval = setInterval(() => {
       localStorage.setItem(
         DRAFT_KEY,
-        JSON.stringify({ title, subtitle, content, tags, category, coverUrl })
+        JSON.stringify({ title, subtitle, content, tags, category, coverUrl, unlisted })
       );
     }, 30000);
     return () => clearInterval(interval);
-  }, [title, subtitle, content, tags, category, coverUrl]);
+  }, [title, subtitle, content, tags, category, coverUrl, unlisted]);
 
   useEffect(() => {
     if (!loading && !user) router.push("/login");

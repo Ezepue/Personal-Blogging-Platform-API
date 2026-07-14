@@ -67,6 +67,7 @@ def get_articles(
     (they remain reachable by direct link). Returns a list, or a
     ``(list, total)`` pair when ``with_total`` is set.
     """
+    skip = max(0, skip)
     query = db.query(ArticleDB)
 
     if status is not None:
@@ -111,7 +112,7 @@ def get_user_drafts(db: Session, author_id: int, skip: int = 0, limit: int = 50)
         db.query(ArticleDB)
         .filter(ArticleDB.author_id == author_id, ArticleDB.status == ArticleStatus.DRAFT)
         .order_by(ArticleDB.id.desc())
-        .offset(skip)
+        .offset(max(0, skip))
         .limit(limit)
         .all()
     )
@@ -143,11 +144,14 @@ def update_article(db: Session, article_id: int, article_data: ArticleUpdate) ->
         article.reading_time_minutes = reading_time_minutes(data["content"])
         article.word_count = word_count(data["content"])
 
+    # Regenerate the slug only when the title actually changes, excluding this
+    # article from the uniqueness check so an unchanged title doesn't churn the URL.
+    new_title = data.get("title")
+    if new_title and new_title != article.title:
+        article.slug = unique_slug(db, new_title, exclude_id=article.id)
+
     for key, value in data.items():
         setattr(article, key, value)
-
-    if data.get("title"):
-        article.slug = unique_slug(db, data["title"])
 
     if "status" in data:
         if data["status"] == ArticleStatus.PUBLISHED and article.published_date is None:
@@ -185,3 +189,13 @@ def get_article_with_likes(db: Session, article_id: int) -> ArticleDB:
     if not article:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Article not found")
     return article
+
+
+def can_view_article(article: ArticleDB, user) -> bool:
+    """Published articles are public; drafts/deleted are visible only to the author or an admin."""
+    if article.status == ArticleStatus.PUBLISHED:
+        return True
+    if user is None:
+        return False
+    from app.models.enums import UserRole
+    return article.author_id == user.id or user.role in {UserRole.ADMIN, UserRole.SUPER_ADMIN}

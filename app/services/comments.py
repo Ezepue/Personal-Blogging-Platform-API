@@ -56,7 +56,7 @@ def get_comments_by_article(
         query = query.order_by(CommentDB.likes_count.desc(), CommentDB.created_date.desc())
     else:
         query = query.order_by(CommentDB.created_date.desc())
-    return query.offset(skip).limit(limit).all()
+    return query.offset(max(0, skip)).limit(limit).all()
 
 
 def get_comment_by_id(db: Session, comment_id: int) -> CommentDB:

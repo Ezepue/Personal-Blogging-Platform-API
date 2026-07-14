@@ -14,18 +14,27 @@ class WebSocketManager:
         self.active_connections: Dict[int, WebSocket] = {}
 
     async def connect(self, websocket: WebSocket, user_id: int) -> None:
-        """Accept the socket and register it for the user."""
+        """Accept the socket and register it as the user's current connection."""
         await websocket.accept()
         self.active_connections[user_id] = websocket
 
-    async def disconnect(self, user_id: int) -> None:
-        """Unregister and close the user's socket, tolerating already-closed sockets."""
-        websocket = self.active_connections.pop(user_id, None)
-        if websocket is not None:
-            try:
-                await websocket.close()
-            except Exception as e:
-                logger.debug(f"Error closing WebSocket for user {user_id}: {e}")
+    async def disconnect(self, user_id: int, websocket: WebSocket = None) -> None:
+        """Unregister the user's socket.
+
+        Only removes the registry entry when it still points at ``websocket`` (when
+        given), so a stale tab disconnecting cannot evict a newer live connection
+        that replaced it.
+        """
+        current = self.active_connections.get(user_id)
+        if current is None:
+            return
+        if websocket is not None and current is not websocket:
+            return
+        self.active_connections.pop(user_id, None)
+        try:
+            await current.close()
+        except Exception as e:
+            logger.debug(f"Error closing WebSocket for user {user_id}: {e}")
 
     async def send_message(self, user_id: int, message: str) -> None:
         """Send text to the user's socket; drop the connection on failure."""

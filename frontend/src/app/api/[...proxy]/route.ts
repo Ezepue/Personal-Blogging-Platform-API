@@ -45,14 +45,22 @@ async function handler(req: NextRequest, { params }: { params: { proxy: string[]
   // token and replay the original request once. Keeps sessions alive across the
   // 30-minute access-token expiry without a visible logout.
   if (upstream.status === 401 && refreshToken) {
-    const refreshRes = await fetch(`${API_URL}/users/refresh?refresh_token=${encodeURIComponent(refreshToken)}`, {
+    const refreshRes = await fetch(`${API_URL}/users/refresh`, {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refresh_token: refreshToken }),
       cache: "no-store",
     });
     if (refreshRes.ok) {
-      const data = (await refreshRes.json()) as { access_token: string };
-      refreshedAccess = data.access_token;
-      upstream = await callUpstream(req.method, url, refreshedAccess, contentType, body);
+      try {
+        const data = (await refreshRes.json()) as { access_token: string };
+        if (data?.access_token) {
+          refreshedAccess = data.access_token;
+          upstream = await callUpstream(req.method, url, refreshedAccess, contentType, body);
+        }
+      } catch {
+        // Malformed refresh response — fall through with the original 401.
+      }
     }
   }
 

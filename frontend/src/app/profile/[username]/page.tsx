@@ -143,7 +143,7 @@ export default async function ProfilePage({
 
       {/* Posts / drafts tabs */}
       <div className="fade-up fade-up-2">
-        <ProfileDraftsTab username={username} posts={posts} role={profile.role} />
+        <ProfileDraftsTab username={username} posts={posts} />
       </div>
     </div>
   );

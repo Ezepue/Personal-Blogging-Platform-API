@@ -1,12 +1,14 @@
 import logging
 import os
+import secrets
 from fastapi import APIRouter, Depends, HTTPException, status, Request, UploadFile, File
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from fastapi.security import OAuth2PasswordRequestForm
 from datetime import timedelta
 from typing import List
 from slowapi import Limiter
-from slowapi.util import get_remote_address
+from app.core.ratelimit import client_ip_key
 
 from app.db.session import get_db
 from app.schemas.user import (
@@ -14,7 +16,7 @@ from app.schemas.user import (
     NotificationPrefs, FollowUserEntry, AccountDelete,
 )
 from app.schemas.article import ArticleResponse
-from app.schemas.token import RefreshTokenResponse
+from app.schemas.token import RefreshTokenResponse, RefreshRequest
 from app.models.view_history import ViewHistoryDB
 from app.services import delete_user_from_db, get_user_drafts
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
@@ -24,7 +26,7 @@ from app.api.deps import (
     verify_user_credentials, create_refresh_token, verify_refresh_token, create_ws_ticket
 )
 from app.services import create_new_user, get_user_by_username, update_user_profile
-from app.utils.file_validation import is_valid_image
+from app.utils.file_validation import detect_file_type
 from app.services.notifications import send_notification_to_user
 from app.models.user import UserDB, UserRole
 from app.models.article import ArticleDB
@@ -35,8 +37,16 @@ from app.core.config import ACCESS_TOKEN_EXPIRE_MINUTES, REFRESH_TOKEN_EXPIRE_DA
 
 logger = logging.getLogger(__name__)
 
+# Detected image MIME -> stored extension for avatars.
+IMAGE_MIME_TO_EXT = {
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/gif": ".gif",
+    "image/webp": ".webp",
+}
+
 router = APIRouter()
-limiter = Limiter(key_func=get_remote_address)
+limiter = Limiter(key_func=client_ip_key)
 
 @router.post("/register", response_model=UserResponse)
 @limiter.limit("5/hour")
@@ -84,19 +94,21 @@ def login(
     }
 
 @router.post("/refresh")
-def refresh_access_token(refresh_token: str, db: Session = Depends(get_db)):
-    """Refresh access token using a valid refresh token."""
-    user_id = verify_refresh_token(refresh_token, db)
+def refresh_access_token(body: RefreshRequest, db: Session = Depends(get_db)):
+    """Refresh an access token from a valid refresh token (carried in the body)."""
+    user_id = verify_refresh_token(body.refresh_token, db)
     if not user_id:
         logger.warning("Invalid or expired refresh token")
         raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
 
-    new_access_token = create_access_token(
-        {"sub": str(user_id)},
-        timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    )
+    user = db.query(UserDB).filter(UserDB.id == user_id).first()
+    if user is None or not user.is_active:
+        raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
 
-    logger.info(f"Access token refreshed for user {user_id}")
+    new_access_token = create_access_token(
+        {"sub": str(user_id), "role": user.role.value},
+        timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
+    )
     return {"access_token": new_access_token, "token_type": "bearer"}
 
 @router.post("/logout", status_code=status.HTTP_200_OK)
@@ -136,15 +148,18 @@ async def update_my_profile(
     current_user: UserDB = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    if data.username and data.username != current_user.username:
-        existing = get_user_by_username(db, data.username)
-        if existing:
+    # Usernames and emails are stored lowercase; compare case-insensitively so a
+    # case-variant of an existing name is rejected (not left to hit the DB unique
+    # constraint as a 500).
+    if data.username and data.username.lower() != current_user.username:
+        if db.query(UserDB).filter(func.lower(UserDB.username) == data.username.lower()).first():
             raise HTTPException(status_code=409, detail="Username already taken")
-    if data.email and data.email != current_user.email:
-        existing_email = db.query(UserDB).filter(UserDB.email == data.email).first()
-        if existing_email:
+    if data.email and data.email.lower() != current_user.email:
+        if db.query(UserDB).filter(func.lower(UserDB.email) == data.email.lower()).first():
             raise HTTPException(status_code=409, detail="Email already in use")
-    updated = update_user_profile(db, current_user, data.model_dump(exclude_none=True))
+    # exclude_unset (not exclude_none) so the client can explicitly clear a field
+    # (e.g. remove a website) by sending null.
+    updated = update_user_profile(db, current_user, data.model_dump(exclude_unset=True))
     return updated
 
 @router.put("/me/password")
@@ -156,6 +171,10 @@ async def change_password(
     if not verify_password(data.current_password, current_user.hashed_password):
         raise HTTPException(status_code=400, detail="Current password is incorrect")
     current_user.hashed_password = hash_password(data.new_password)
+    # Revoke existing sessions so a stolen refresh token can't outlive the reset.
+    db.query(RefreshTokenDB).filter_by(user_id=current_user.id, is_active=True).update(
+        {"is_active": False, "revoked": True}
+    )
     db.commit()
     return {"message": "Password updated successfully"}
 
@@ -165,25 +184,22 @@ async def upload_avatar(
     current_user: UserDB = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    allowed = {"image/jpeg", "image/png", "image/webp", "image/gif"}
-    if file.content_type not in allowed:
-        raise HTTPException(status_code=400, detail="Only image files are allowed for avatars")
-    safe_name = os.path.basename(file.filename or "upload")
-    filename = f"avatar_{current_user.id}_{safe_name}"
-    path = os.path.join(UPLOAD_FOLDER, filename)
-    if not os.path.abspath(path).startswith(os.path.abspath(UPLOAD_FOLDER)):
-        raise HTTPException(status_code=400, detail="Invalid filename")
     MAX_AVATAR_SIZE = 10 * 1024 * 1024  # 10MB
     contents = await file.read()
     if len(contents) > MAX_AVATAR_SIZE:
         raise HTTPException(status_code=413, detail="File too large. Maximum size is 10MB.")
-    # Verify the bytes are actually an image, not a mislabeled payload.
-    if not is_valid_image(contents):
-        raise HTTPException(status_code=400, detail="Uploaded file is not a valid image")
+    # Verify the bytes are actually an image, and derive the stored extension from
+    # the detected type — never from the client filename — so a mislabeled payload
+    # (e.g. an HTML file named avatar.html) can't be stored and served as script.
+    detected = detect_file_type(contents)
+    ext = IMAGE_MIME_TO_EXT.get(detected)
+    if ext is None:
+        raise HTTPException(status_code=400, detail="Only image files are allowed for avatars")
+    filename = f"avatar_{current_user.id}_{secrets.token_hex(8)}{ext}"
+    path = os.path.join(UPLOAD_FOLDER, filename)
     with open(path, "wb") as f:
         f.write(contents)
-    avatar_url = f"/media/{filename}"
-    current_user.avatar_url = avatar_url
+    current_user.avatar_url = f"/media/{filename}"
     db.commit()
     db.refresh(current_user)
     return current_user
@@ -207,16 +223,8 @@ async def update_notification_prefs(
     return current_user
 
 
-@router.get("/{username}/profile", response_model=UserPublicProfile)
-async def get_public_profile(
-    username: str,
-    db: Session = Depends(get_db),
-    current_user: Optional[UserDB] = Depends(get_optional_user),
-):
-    user = get_user_by_username(db, username)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
+def _build_public_profile(db: Session, user: UserDB, current_user: Optional[UserDB]) -> UserPublicProfile:
+    """Serialize a user to UserPublicProfile with aggregate follower/story counts."""
     profile = UserPublicProfile.model_validate(user)
     profile.followers_count = db.query(FollowDB).filter(FollowDB.followed_id == user.id).count()
     profile.following_count = db.query(FollowDB).filter(FollowDB.follower_id == user.id).count()
@@ -233,6 +241,18 @@ async def get_public_profile(
             is not None
         )
     return profile
+
+
+@router.get("/{username}/profile", response_model=UserPublicProfile)
+async def get_public_profile(
+    username: str,
+    db: Session = Depends(get_db),
+    current_user: Optional[UserDB] = Depends(get_optional_user),
+):
+    user = get_user_by_username(db, username)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return _build_public_profile(db, user, current_user)
 
 
 @router.post("/{username}/follow", status_code=status.HTTP_200_OK)
@@ -304,7 +324,7 @@ async def list_followers(username: str, db: Session = Depends(get_db), skip: int
         db.query(UserDB)
         .join(FollowDB, FollowDB.follower_id == UserDB.id)
         .filter(FollowDB.followed_id == user.id)
-        .offset(skip).limit(limit).all()
+        .offset(max(0, skip)).limit(limit).all()
     )
     return rows
 
@@ -320,7 +340,7 @@ async def list_following(username: str, db: Session = Depends(get_db), skip: int
         db.query(UserDB)
         .join(FollowDB, FollowDB.followed_id == UserDB.id)
         .filter(FollowDB.follower_id == user.id)
-        .offset(skip).limit(limit).all()
+        .offset(max(0, skip)).limit(limit).all()
     )
     return rows
 
@@ -340,7 +360,7 @@ async def get_user_articles(
         db.query(ArticleDB)
         .filter(ArticleDB.author_id == user.id, ArticleDB.status == ArticleStatus.PUBLISHED)
         .order_by(ArticleDB.id.desc())
-        .offset(skip)
+        .offset(max(0, skip))
         .limit(min(100, max(1, limit)))
         .all()
     )
@@ -362,7 +382,7 @@ async def pin_article(
     current_user.pinned_article_id = article_id
     db.commit()
     db.refresh(current_user)
-    return UserPublicProfile.model_validate(current_user)
+    return _build_public_profile(db, current_user, current_user)
 
 
 @router.delete("/me/pin", response_model=UserPublicProfile)
@@ -374,7 +394,7 @@ async def unpin_article(
     current_user.pinned_article_id = None
     db.commit()
     db.refresh(current_user)
-    return UserPublicProfile.model_validate(current_user)
+    return _build_public_profile(db, current_user, current_user)
 
 
 @router.get("/me/sessions", response_model=List[RefreshTokenResponse])

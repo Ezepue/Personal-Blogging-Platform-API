@@ -2,6 +2,12 @@ from pydantic import BaseModel
 from datetime import datetime
 from typing import Optional
 
+
+class RefreshRequest(BaseModel):
+    """Refresh token carried in the request body (never the URL, to keep it out of logs)."""
+    refresh_token: str
+
+
 class TokenResponse(BaseModel):
     access_token: str
     refresh_token: str

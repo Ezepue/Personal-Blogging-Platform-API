@@ -9,6 +9,7 @@ import {
 } from "react";
 
 import type { User } from "@/types/user";
+import { errorMessage } from "@/lib/api";
 
 type AuthContextType = {
   user: User | null;
@@ -44,8 +45,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       body: JSON.stringify({ username, password }),
     });
     if (!res.ok) {
-      const err = await res.json().catch(() => ({ detail: "Login failed" }));
-      throw new Error(err.detail ?? "Login failed");
+      const err = await res.json().catch(() => null);
+      throw new Error(errorMessage(err, "Login failed"));
     }
     await refreshUser();
   };

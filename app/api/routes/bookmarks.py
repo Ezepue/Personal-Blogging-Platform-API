@@ -11,7 +11,7 @@ from app.models.user import UserDB
 from app.models.enums import ArticleStatus
 from app.schemas.article import ArticleResponse
 from app.api.deps import get_current_user
-from app.services import get_article_by_id
+from app.services import get_article_by_id, can_view_article
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +35,7 @@ def list_bookmarks(
             ArticleDB.status == ArticleStatus.PUBLISHED,
         )
         .order_by(BookmarkDB.created_at.desc())
-        .offset(skip)
+        .offset(max(0, skip))
         .limit(limit)
         .all()
     )
@@ -65,7 +65,9 @@ def add_bookmark(
     current_user: UserDB = Depends(get_current_user),
 ):
     """Save an article to the reading list."""
-    get_article_by_id(db, article_id)  # 404 if missing
+    article = get_article_by_id(db, article_id)  # 404 if missing
+    if not can_view_article(article, current_user):
+        raise HTTPException(status_code=404, detail="Article not found")
     try:
         db.add(BookmarkDB(user_id=current_user.id, article_id=article_id))
         db.commit()

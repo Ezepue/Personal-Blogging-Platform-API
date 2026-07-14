@@ -169,11 +169,14 @@ export default function CommentSection({ articleId }: { articleId: number }) {
   const repliesFor = (id: number) =>
     comments.filter((c) => c.parent_id === id).sort((a, b) => +new Date(a.created_date) - +new Date(b.created_date));
 
-  const Body = ({ c, isReply = false }: { c: Comment; isReply?: boolean }) => {
+  // Rendered as a plain function call (not <Body/>), so it does not create a new
+  // component identity each render — the in-progress reply/edit Composer keeps its
+  // state when an unrelated comment is liked or the sort changes.
+  const renderComment = (c: Comment, isReply = false) => {
     const replies = repliesFor(c.id);
     const isCollapsed = collapsed.has(c.id);
     return (
-      <div className={isReply ? "ml-9 mt-3" : ""}>
+      <div key={c.id} className={isReply ? "ml-9 mt-3" : ""}>
         <div className="bg-surface border border-border rounded-2xl p-4">
           <div className="flex items-center gap-2 mb-2 text-xs text-muted">
             <Avatar user={c.user} />
@@ -218,7 +221,7 @@ export default function CommentSection({ articleId }: { articleId: number }) {
                 {isCollapsed ? `Show ${replies.length} replies` : "Hide replies"}
               </button>
             )}
-            {!isCollapsed && replies.map((r) => <Body key={r.id} c={r} isReply />)}
+            {!isCollapsed && replies.map((r) => renderComment(r, true))}
           </>
         )}
       </div>
@@ -255,7 +258,7 @@ export default function CommentSection({ articleId }: { articleId: number }) {
       )}
 
       <div className="space-y-4">
-        {topLevel.map((c) => <Body key={c.id} c={c} />)}
+        {topLevel.map((c) => renderComment(c))}
         {comments.length === 0 && <p className="text-muted text-sm text-center py-8">No comments yet. Be the first!</p>}
       </div>
     </div>

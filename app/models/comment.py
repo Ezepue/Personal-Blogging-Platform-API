@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Integer, Text, DateTime, ForeignKey, func, Boolean
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, backref
 from app.db.base_class import Base
 
 
@@ -20,4 +20,11 @@ class CommentDB(Base):
 
     user = relationship("UserDB", back_populates="comments", passive_deletes=True)
     article = relationship("ArticleDB", back_populates="comments", passive_deletes=True)
-    parent = relationship("CommentDB", remote_side=[id], backref="replies", passive_deletes=True)
+    # Deleting a parent comment cascades to its replies (matching the FK's
+    # ON DELETE CASCADE) rather than orphaning them as top-level comments.
+    replies = relationship(
+        "CommentDB",
+        backref=backref("parent", remote_side=[id]),
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )

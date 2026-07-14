@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 _PREF_FOR_TYPE = {
     "like": "notify_likes",
     "comment": "notify_comments",
+    "mention": "notify_comments",  # mentions arrive via comments; gate them together
     "follow": "notify_follows",
 }
 
@@ -49,7 +50,7 @@ def fetch_unread_notifications(db: Session, user_id: int, skip: int = 0, limit: 
         db.query(NotificationDB)
         .filter(NotificationDB.user_id == user_id, NotificationDB.is_read == False)
         .order_by(NotificationDB.created_at.desc())
-        .offset(skip)
+        .offset(max(0, skip))
         .limit(limit)
         .all()
     )

@@ -26,7 +26,12 @@ export default function LoadMoreFeed({
       const res = await fetch(`/api/articles?sort=${sort}&skip=${posts.length}&limit=12`);
       if (res.ok) {
         const next: Post[] = await res.json();
-        setPosts((prev) => [...prev, ...next]);
+        // Dedup by id: the list can shift between the cached first page and this
+        // live fetch, so a story could arrive twice (duplicate React keys).
+        setPosts((prev) => {
+          const seen = new Set(prev.map((p) => p.id));
+          return [...prev, ...next.filter((p) => !seen.has(p.id))];
+        });
       }
     } finally {
       setLoading(false);

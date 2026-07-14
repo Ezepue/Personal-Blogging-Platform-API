@@ -41,7 +41,6 @@ def promote_to_admin(
     current_user: UserDB = Depends(require_super_admin)
 ):
     """ Super admins can promote users to admin or super admin. """
-    # Validate role
     new_role = UserRole.__members__.get(role.upper())
     if not new_role:
         raise HTTPException(
@@ -49,12 +48,16 @@ def promote_to_admin(
             detail="Invalid role. Choose 'admin' or 'super_admin'."
         )
 
-    # Prevent promoting yourself
     if current_user.id == user_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="You cannot change your own role."
         )
+
+    # Never silently demote an existing super admin through this endpoint.
+    target = get_user_by_id(db, user_id)
+    if target.role == UserRole.SUPER_ADMIN and new_role != UserRole.SUPER_ADMIN:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Super Admins cannot be demoted")
 
     promote_user(db, user_id, new_role)
     logger.info(f"Super Admin {current_user.id} promoted User {user_id} to {new_role.name}.")
@@ -96,7 +99,7 @@ def list_all_articles(
     current_user: UserDB = Depends(require_admin)
 ):
     """ Admins can view all articles regardless of status. """
-    articles = get_articles(db, status=None, limit=100)
+    articles = get_articles(db, status=None, include_unlisted=True, limit=200)
     logger.info(f"Admin {current_user.id} retrieved {len(articles)} articles.")
     return articles
 
