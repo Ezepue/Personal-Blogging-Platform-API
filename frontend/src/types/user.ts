@@ -5,4 +5,5 @@ export type User = {
   role: string;
   bio?: string | null;
   avatar_url?: string | null;
+  is_verified?: boolean;
 };

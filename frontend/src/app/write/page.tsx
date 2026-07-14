@@ -21,6 +21,7 @@ export default function WritePage() {
   const [tags, setTags] = useState("");
   const [category, setCategory] = useState("");
   const [coverUrl, setCoverUrl] = useState("");
+  const [unlisted, setUnlisted] = useState(false);
   const [savingAction, setSavingAction] = useState<"draft" | "publish" | null>(null);
   const [error, setError] = useState("");
   const [initialized, setInitialized] = useState(false);
@@ -79,6 +80,7 @@ export default function WritePage() {
           tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
           category: category || undefined,
           cover_image_url: coverUrl || null,
+          is_unlisted: unlisted,
           status: publish ? "published" : "draft",
         }),
       });
@@ -145,6 +147,11 @@ export default function WritePage() {
       ) : (
         <div className="min-h-[400px] bg-surface border border-border rounded-xl" />
       )}
+
+      <label className="flex items-center gap-2 mt-4 text-sm text-muted cursor-pointer w-fit">
+        <input type="checkbox" checked={unlisted} onChange={(e) => setUnlisted(e.target.checked)} className="w-4 h-4 accent-[var(--accent)]" />
+        Unlisted — reachable by link, hidden from feeds and search
+      </label>
 
       {error && <p className="text-red-400 text-sm mt-3">{error}</p>}
 
