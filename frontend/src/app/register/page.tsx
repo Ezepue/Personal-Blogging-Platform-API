@@ -47,7 +47,7 @@ export default function RegisterPage() {
 
   return (
     <div className="max-w-sm mx-auto mt-16">
-      <h1 className="text-3xl font-bold text-[#f1f1f5] mb-8 text-center">
+      <h1 className="text-3xl font-bold text-ink mb-8 text-center">
         Create account
       </h1>
 
@@ -64,7 +64,7 @@ export default function RegisterPage() {
               onChange={(e) => setForm({ ...form, [key]: e.target.value })}
               required
               autoComplete={autoComplete}
-              className="w-full bg-surface border border-border rounded-lg px-4 py-2.5 text-[#f1f1f5] focus:outline-none focus:border-accent transition-colors"
+              className="w-full bg-surface border border-border rounded-lg px-4 py-2.5 text-ink focus:outline-none focus:border-accent transition-colors"
             />
           </div>
         ))}

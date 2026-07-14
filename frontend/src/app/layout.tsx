@@ -4,13 +4,20 @@ import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Quill",
-  description: "A personal blogging platform for stories worth reading.",
+  title: {
+    default: "Quill — stories worth reading",
+    template: "%s — Quill",
+  },
+  description: "An editorial home for essays, ideas, and stories worth reading.",
 };
+
+// Applied before hydration so the page never flashes the wrong theme.
+const themeInit = `(function(){try{var t=localStorage.getItem("quill-theme");if(!t){t=window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";}document.documentElement.setAttribute("data-theme",t);}catch(e){}})();`;
 
 export default function RootLayout({
   children,
@@ -18,12 +25,18 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="dark">
-      <body className={`${inter.className} bg-base min-h-screen`}>
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInit }} />
+      </head>
+      <body className={`${inter.className} min-h-screen flex flex-col`}>
         <AuthProvider>
           <NotificationProvider>
             <Navbar />
-            <main className="max-w-5xl mx-auto px-4 py-8">{children}</main>
+            <main className="relative z-10 flex-1 w-full max-w-6xl mx-auto px-4 sm:px-6 py-10">
+              {children}
+            </main>
+            <Footer />
           </NotificationProvider>
         </AuthProvider>
       </body>

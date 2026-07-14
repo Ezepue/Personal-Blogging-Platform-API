@@ -73,8 +73,8 @@ export default function ProfileDraftsTab({ username, posts, role }: Props) {
           onClick={() => setActiveTab("posts")}
           className={`px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px ${
             activeTab === "posts"
-              ? "border-accent text-[#f1f1f5]"
-              : "border-transparent text-muted hover:text-[#f1f1f5]"
+              ? "border-accent text-ink"
+              : "border-transparent text-muted hover:text-ink"
           }`}
         >
           Posts
@@ -88,8 +88,8 @@ export default function ProfileDraftsTab({ username, posts, role }: Props) {
             onClick={() => setActiveTab("drafts")}
             className={`px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px ${
               activeTab === "drafts"
-                ? "border-accent text-[#f1f1f5]"
-                : "border-transparent text-muted hover:text-[#f1f1f5]"
+                ? "border-accent text-ink"
+                : "border-transparent text-muted hover:text-ink"
             }`}
           >
             Drafts
@@ -135,7 +135,7 @@ export default function ProfileDraftsTab({ username, posts, role }: Props) {
                   <div className="absolute top-4 right-4 flex gap-2">
                     <a
                       href={`/write/${draft.id}`}
-                      className="text-xs bg-surface border border-border rounded-md px-2 py-1 text-muted hover:text-[#f1f1f5] hover:border-accent transition-colors"
+                      className="text-xs bg-surface border border-border rounded-md px-2 py-1 text-muted hover:text-ink hover:border-accent transition-colors"
                     >
                       Edit
                     </a>

@@ -11,9 +11,12 @@ class ArticleDB(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String, nullable=False, index=True)
+    subtitle = Column(String(300), nullable=True)
+    slug = Column(String(250), unique=True, nullable=True, index=True)
     content = Column(Text, nullable=False)
     tags = Column(JSONB, nullable=False, default=lambda: [])
     category = Column(String, nullable=True)
+    cover_image_url = Column(String(500), nullable=True)
 
     status = Column(Enum(ArticleStatus, native_enum=True), default=ArticleStatus.DRAFT, nullable=False)
     published_date = Column(DateTime, nullable=True, index=True)
@@ -26,3 +29,5 @@ class ArticleDB(Base):
     comments = relationship("CommentDB", back_populates="article", cascade="all, delete-orphan", passive_deletes=True)
 
     likes_count = Column(Integer, default=0, nullable=False)
+    views_count = Column(Integer, default=0, nullable=False, server_default="0")
+    reading_time_minutes = Column(Integer, default=1, nullable=False, server_default="1")

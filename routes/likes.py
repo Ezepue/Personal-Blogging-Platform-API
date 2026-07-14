@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 from sqlalchemy import update, func
 from models.article import ArticleDB
 from models.like import LikeDB
@@ -41,18 +41,21 @@ async def like_article(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You already liked this article")
 
     try:
-        # Insert like
+        # Insert like, then recompute the denormalized count — committed atomically.
         new_like = LikeDB(article_id=article_id, user_id=user.id)
         db.add(new_like)
-        db.commit()
+        db.flush()  # surfaces the unique-constraint violation before we commit
 
-        # Update likes_count using COUNT(*)
         likes_count = db.query(func.count(LikeDB.id)).filter(LikeDB.article_id == article_id).scalar()
         db.query(ArticleDB).filter(ArticleDB.id == article_id).update({"likes_count": likes_count})
         db.commit()
 
         logger.info(f"User {user.id} liked article {article_id}, new count: {likes_count}")
 
+    except IntegrityError:
+        # Concurrent duplicate like — the unique constraint fired.
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You already liked this article")
     except SQLAlchemyError as e:
         db.rollback()
         logger.error(f"Error processing like for article {article_id}: {str(e)}")
@@ -65,6 +68,8 @@ async def like_article(
                 db=db,
                 user_id=article.author_id,
                 message=f"{user.username} liked your article \"{article.title}\"",
+                notif_type="like",
+                extra_data={"article_id": article.id},
             )
         except Exception:
             pass  # notification failure must not fail the like operation
@@ -100,11 +105,10 @@ def unlike_article(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You have not liked this article")
 
     try:
-        # ✅ Delete the like
+        # Delete the like and recompute the count in a single transaction.
         db.delete(like)
-        db.commit()
+        db.flush()
 
-        # ✅ Update likes_count using COUNT(*)
         likes_count = db.query(func.count(LikeDB.id)).filter(LikeDB.article_id == article_id).scalar()
         db.query(ArticleDB).filter(ArticleDB.id == article_id).update({"likes_count": likes_count})
         db.commit()
@@ -122,6 +126,25 @@ def unlike_article(
         article_id=article.id,
         likes_count=likes_count
     )
+
+
+@router.get("/{article_id}/status")
+def get_like_status(
+    article_id: int,
+    db: Session = Depends(get_db),
+    user: UserDB = Depends(get_current_user),
+):
+    """Return whether the current user has liked the article, plus the total count."""
+    likes_count = db.query(ArticleDB.likes_count).filter(ArticleDB.id == article_id).scalar()
+    if likes_count is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Article not found")
+
+    liked = db.query(LikeDB).filter(
+        LikeDB.article_id == article_id,
+        LikeDB.user_id == user.id,
+    ).first() is not None
+
+    return {"liked": liked, "likes_count": likes_count}
 
 
 @router.get("/{article_id}/count", response_model=LikeResponse)

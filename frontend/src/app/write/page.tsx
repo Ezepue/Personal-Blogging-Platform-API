@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import dynamic from "next/dynamic";
+import CoverImagePicker from "@/components/CoverImagePicker";
 
 const Editor = dynamic(() => import("@/components/Editor"), { ssr: false });
 
@@ -15,9 +16,11 @@ export default function WritePage() {
   const router = useRouter();
 
   const [title, setTitle] = useState("");
+  const [subtitle, setSubtitle] = useState("");
   const [content, setContent] = useState("");
   const [tags, setTags] = useState("");
   const [category, setCategory] = useState("");
+  const [coverUrl, setCoverUrl] = useState("");
   const [savingAction, setSavingAction] = useState<"draft" | "publish" | null>(null);
   const [error, setError] = useState("");
   const [initialized, setInitialized] = useState(false);
@@ -29,9 +32,11 @@ export default function WritePage() {
       try {
         const d = JSON.parse(saved);
         setTitle(d.title ?? "");
+        setSubtitle(d.subtitle ?? "");
         setContent(d.content ?? "");
         setTags(d.tags ?? "");
         setCategory(d.category ?? "");
+        setCoverUrl(d.coverUrl ?? "");
       } catch {
         // ignore malformed draft
       }
@@ -42,10 +47,13 @@ export default function WritePage() {
   // Auto-save every 30s
   useEffect(() => {
     const interval = setInterval(() => {
-      localStorage.setItem(DRAFT_KEY, JSON.stringify({ title, content, tags, category }));
+      localStorage.setItem(
+        DRAFT_KEY,
+        JSON.stringify({ title, subtitle, content, tags, category, coverUrl })
+      );
     }, 30000);
     return () => clearInterval(interval);
-  }, [title, content, tags, category]);
+  }, [title, subtitle, content, tags, category, coverUrl]);
 
   useEffect(() => {
     if (!loading && !user) router.push("/login");
@@ -66,21 +74,18 @@ export default function WritePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title,
+          subtitle: subtitle.trim() || null,
           content,
           tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
           category: category || undefined,
+          cover_image_url: coverUrl || null,
+          status: publish ? "published" : "draft",
         }),
       });
       if (res.ok) {
         const article = await res.json();
         localStorage.removeItem(DRAFT_KEY);
-        if (publish) {
-          await fetch(`/api/articles/${article.id}/publish`, { method: "PUT" });
-          router.push(`/posts/${article.id}`);
-        } else {
-          // Stay on the edit page for drafts so the user can continue editing
-          router.push(`/write/${article.id}`);
-        }
+        router.push(publish ? `/posts/${article.id}` : `/write/${article.id}`);
       } else {
         const err = await res.json().catch(() => ({}));
         setError((err as { detail?: string }).detail ?? "Failed to save");
@@ -93,35 +98,45 @@ export default function WritePage() {
   return (
     <div className="max-w-3xl mx-auto">
       {/* Top bar */}
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-lg font-semibold text-[#f1f1f5]">New Post</h1>
-        <Link href="/drafts" className="text-sm text-muted hover:text-[#f1f1f5] transition-colors">
-          My Drafts →
+      <div className="flex items-center justify-between mb-8">
+        <p className="text-xs uppercase tracking-[0.3em] text-muted">New story</p>
+        <Link href="/drafts" className="text-sm text-muted hover:text-ink transition-colors link-flourish">
+          My drafts →
         </Link>
       </div>
+
+      <CoverImagePicker value={coverUrl} onChange={setCoverUrl} />
 
       <input
         type="text"
         value={title}
         onChange={(e) => setTitle(e.target.value)}
-        placeholder="Post title…"
-        className="w-full bg-transparent text-4xl font-bold text-[#f1f1f5] placeholder:text-muted outline-none mb-4 border-b border-border pb-4"
+        placeholder="Title…"
+        className="w-full bg-transparent font-display text-4xl sm:text-5xl text-ink placeholder:text-muted outline-none mb-3"
+      />
+      <input
+        type="text"
+        value={subtitle}
+        onChange={(e) => setSubtitle(e.target.value)}
+        placeholder="A short subtitle (optional)…"
+        maxLength={300}
+        className="w-full bg-transparent font-display italic text-xl text-ink-soft placeholder:text-muted outline-none mb-6 border-b border-border pb-5"
       />
 
-      <div className="flex gap-4 mb-4">
+      <div className="flex gap-4 mb-5">
         <input
           type="text"
           value={tags}
           onChange={(e) => setTags(e.target.value)}
           placeholder="Tags (comma-separated)"
-          className="flex-1 bg-surface border border-border rounded-lg px-3 py-2 text-[#f1f1f5] placeholder:text-muted text-sm focus:outline-none focus:border-accent transition-colors"
+          className="flex-1 bg-surface border border-border rounded-lg px-3 py-2 text-ink placeholder:text-muted text-sm focus:outline-none focus:border-accent transition-colors"
         />
         <input
           type="text"
           value={category}
           onChange={(e) => setCategory(e.target.value)}
           placeholder="Category"
-          className="flex-1 bg-surface border border-border rounded-lg px-3 py-2 text-[#f1f1f5] placeholder:text-muted text-sm focus:outline-none focus:border-accent transition-colors"
+          className="flex-1 bg-surface border border-border rounded-lg px-3 py-2 text-ink placeholder:text-muted text-sm focus:outline-none focus:border-accent transition-colors"
         />
       </div>
 
@@ -137,14 +152,14 @@ export default function WritePage() {
         <button
           onClick={() => submit(false)}
           disabled={savingAction !== null}
-          className="px-5 py-2.5 border border-border rounded-lg text-muted hover:text-[#f1f1f5] hover:border-[#f1f1f5] transition-colors disabled:opacity-50"
+          className="px-5 py-2.5 border border-border rounded-full text-muted hover:text-ink hover:border-ink transition-colors disabled:opacity-50"
         >
-          {savingAction === "draft" ? "Saving…" : "Save Draft"}
+          {savingAction === "draft" ? "Saving…" : "Save draft"}
         </button>
         <button
           onClick={() => submit(true)}
           disabled={savingAction !== null}
-          className="px-5 py-2.5 bg-accent hover:bg-accent-hover text-white rounded-lg font-medium transition-colors disabled:opacity-50"
+          className="px-5 py-2.5 bg-accent hover:bg-accent-hover text-white rounded-full font-medium transition-colors disabled:opacity-50"
         >
           {savingAction === "publish" ? "Publishing…" : "Publish"}
         </button>

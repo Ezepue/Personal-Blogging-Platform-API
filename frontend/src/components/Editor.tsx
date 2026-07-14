@@ -53,7 +53,7 @@ export default function Editor({ content, onChange }: EditorProps) {
       type="button"
       onClick={() => action()}
       className={`px-2 py-1 rounded text-sm transition-colors ${
-        active ? "bg-accent text-white" : "text-muted hover:text-[#f1f1f5] hover:bg-hover"
+        active ? "bg-accent text-white" : "text-muted hover:text-ink hover:bg-hover"
       }`}
     >
       {label}
@@ -78,7 +78,7 @@ export default function Editor({ content, onChange }: EditorProps) {
         <button
           type="button"
           onClick={() => fileRef.current?.click()}
-          className="text-muted hover:text-[#f1f1f5] text-sm px-2 py-1 rounded hover:bg-hover transition-colors"
+          className="text-muted hover:text-ink text-sm px-2 py-1 rounded hover:bg-hover transition-colors"
         >
           Image
         </button>
@@ -98,7 +98,7 @@ export default function Editor({ content, onChange }: EditorProps) {
       {/* Editor area */}
       <EditorContent
         editor={editor}
-        className="min-h-[400px] px-6 py-4 text-[#f1f1f5] focus:outline-none
+        className="min-h-[400px] px-6 py-4 text-ink focus:outline-none
           [&_.ProseMirror]:outline-none
           [&_.ProseMirror_h1]:text-3xl [&_.ProseMirror_h1]:font-bold [&_.ProseMirror_h1]:mb-4
           [&_.ProseMirror_h2]:text-2xl [&_.ProseMirror_h2]:font-bold [&_.ProseMirror_h2]:mb-3

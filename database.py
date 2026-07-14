@@ -1,8 +1,7 @@
 import os
 import logging
 from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import declarative_base, sessionmaker
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
@@ -37,9 +36,14 @@ Base = declarative_base()
 # Dependency to get a database session
 def get_db():
     """ Dependency function to get a database session. """
+    from fastapi import HTTPException
     db = SessionLocal()
     try:
         yield db
+    except HTTPException:
+        # Normal request-handling control flow (401/403/404/...), not a DB error.
+        db.rollback()
+        raise
     except Exception as e:
         logger.error(f"Error occurred during the database session: {e}", exc_info=True)
         db.rollback()

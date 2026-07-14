@@ -19,7 +19,7 @@ class RefreshTokenDB(Base):
         Index("idx_user_expires", "user_id", "expires_at"),
     )
 
-    user = relationship("UserDB", back_populates="refresh_tokens", passive_deletes=True, lazy="joined")
+    user = relationship("UserDB", back_populates="refresh_tokens", passive_deletes=True)
 
     def is_valid(self) -> bool:
         """Check if the token is still valid, not revoked, and active."""

@@ -1,4 +1,5 @@
 from typing import Optional
+from datetime import datetime
 from pydantic import BaseModel, SecretStr, EmailStr, Field, ConfigDict, field_validator
 from models.enums import UserRole
 
@@ -48,6 +49,10 @@ class UserProfileUpdate(BaseModel):
     username: Optional[str] = None
     email: Optional[EmailStr] = None
     bio: Optional[str] = None
+    website: Optional[str] = Field(None, max_length=300)
+    location: Optional[str] = Field(None, max_length=120)
+    twitter: Optional[str] = Field(None, max_length=80)
+    github: Optional[str] = Field(None, max_length=80)
 
     @field_validator("username")
     @classmethod
@@ -72,5 +77,32 @@ class UserPublicProfile(BaseModel):
     username: str
     bio: Optional[str] = None
     avatar_url: Optional[str] = None
-    role: str
+    role: UserRole
+    website: Optional[str] = None
+    location: Optional[str] = None
+    twitter: Optional[str] = None
+    github: Optional[str] = None
+    created_at: Optional[datetime] = None
+    followers_count: int = 0
+    following_count: int = 0
+    articles_count: int = 0
+    is_followed_by_me: bool = False
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class NotificationPrefs(BaseModel):
+    notify_likes: bool = True
+    notify_comments: bool = True
+    notify_follows: bool = True
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class FollowUserEntry(BaseModel):
+    id: int
+    username: str
+    avatar_url: Optional[str] = None
+    bio: Optional[str] = None
+
     model_config = ConfigDict(from_attributes=True)

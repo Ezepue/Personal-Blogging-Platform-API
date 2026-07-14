@@ -4,8 +4,10 @@ from logging.config import fileConfig
 from sqlalchemy import engine_from_config, pool
 from alembic import context
 
-# Import your database Base and connection URL
+# Import your database Base and connection URL. Importing the models package
+# registers every table on Base.metadata so autogenerate and create_all see them.
 from database import Base, DATABASE_URL
+import models  # noqa: F401  (populates Base.metadata)
 
 # Alembic Config object
 config = context.config

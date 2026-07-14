@@ -1,8 +1,9 @@
 import logging
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from database import Base, engine
 from models import *  # Ensure all models are imported before creating tables
-from routes import likes, users, articles, comments, admin, media, notifications
+from routes import likes, users, articles, comments, admin, media, notifications, bookmarks, dashboard, feeds
 from slowapi.middleware import SlowAPIMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -11,7 +12,7 @@ from starlette.requests import Request as StarletteRequest
 from starlette.responses import JSONResponse
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
-from config import FRONTEND_URL
+from config import FRONTEND_URL, ALLOWED_HOSTS
 
 # --- Logging Configuration ---
 logging.basicConfig(
@@ -20,8 +21,25 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
+# --- Database Initialization ---
+def init_db():
+    """Ensures database tables exist before starting."""
+    logger.info("Initializing database...")
+    Base.metadata.create_all(bind=engine)
+    logger.info("Database initialized successfully.")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan: run startup/shutdown work."""
+    init_db()
+    yield
+    logger.info("Shutting down server...")
+
+
 # --- Initialize FastAPI ---
-app = FastAPI(title="Personal Blogging Platform API")
+app = FastAPI(title="Personal Blogging Platform API", lifespan=lifespan)
 
 # --- Rate Limiting Setup ---
 limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])
@@ -50,25 +68,8 @@ app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(SlowAPIMiddleware)
 app.add_middleware(
     TrustedHostMiddleware,
-    allowed_hosts=["yourdomain.com", "127.0.0.1"]
+    allowed_hosts=ALLOWED_HOSTS,
 )
-
-# --- Database Initialization ---
-def init_db():
-    """Ensures database tables exist before starting."""
-    logger.info("Initializing database...")
-    Base.metadata.create_all(bind=engine)
-    logger.info("Database initialized successfully.")
-
-@app.on_event("startup")
-def startup_event():
-    """Runs on server startup."""
-    init_db()
-
-@app.on_event("shutdown")
-def shutdown_event():
-    """Handles any cleanup or closing operations during shutdown."""
-    logger.info("Shutting down server...")
 
 # --- Register Routers ---
 app.include_router(users.router, prefix="/users", tags=["Users"])
@@ -78,6 +79,9 @@ app.include_router(comments.router, prefix="/comments", tags=["Comments"])
 app.include_router(notifications.router, prefix="/notification", tags=["Notifications"])
 app.include_router(media.router, prefix="/media", tags=["Media"])
 app.include_router(admin.router, prefix="/admin", tags=["Admin"])
+app.include_router(bookmarks.router, prefix="/bookmarks", tags=["Bookmarks"])
+app.include_router(dashboard.router, prefix="/dashboard", tags=["Dashboard"])
+app.include_router(feeds.router, tags=["Feeds"])
 
 # --- Custom 404 Error Handler ---
 @app.exception_handler(404)
@@ -94,3 +98,9 @@ app.add_exception_handler(429, _rate_limit_exceeded_handler)
 async def root():
     """Welcome message."""
     return {"message": "Welcome to the Personal Blogging Platform API!"}
+
+# --- Health Check ---
+@app.get("/health")
+async def health():
+    """Liveness probe used by container/orchestrator health checks."""
+    return {"status": "ok"}

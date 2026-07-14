@@ -9,15 +9,23 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 from database import get_db
-from schemas.user import UserCreate, UserResponse, UserProfileUpdate, UserPasswordChange, UserPublicProfile
+from schemas.user import (
+    UserCreate, UserResponse, UserProfileUpdate, UserPasswordChange, UserPublicProfile,
+    NotificationPrefs, FollowUserEntry,
+)
 from schemas.article import ArticleResponse
+from sqlalchemy.exc import SQLAlchemyError, IntegrityError
+from typing import Optional
 from utils.auth_helpers import (
-    create_access_token, get_current_user, hash_password, verify_password,
-    verify_user_credentials, create_refresh_token, verify_refresh_token
+    create_access_token, get_current_user, get_optional_user, hash_password, verify_password,
+    verify_user_credentials, create_refresh_token, verify_refresh_token, create_ws_ticket
 )
 from utils.db_helpers import create_new_user, get_user_by_username, update_user_profile
+from utils.file_validation import is_valid_image
+from utils.notification_helper import send_notification_to_user
 from models.user import UserDB, UserRole
 from models.article import ArticleDB
+from models.follow import FollowDB
 from models.enums import ArticleStatus
 from models.refresh_token import RefreshTokenDB
 from config import ACCESS_TOKEN_EXPIRE_MINUTES, REFRESH_TOKEN_EXPIRE_DAYS, UPLOAD_FOLDER
@@ -90,23 +98,30 @@ def refresh_access_token(refresh_token: str, db: Session = Depends(get_db)):
 
 @router.post("/logout", status_code=status.HTTP_200_OK)
 def logout_user(
-    db: Session = Depends(get_db), 
+    db: Session = Depends(get_db),
     current_user: UserDB = Depends(get_current_user)
 ):
-    """Logout by deactivating refresh tokens."""
+    """Logout by revoking the user's active refresh tokens. Idempotent."""
     try:
-        refresh_tokens = db.query(RefreshTokenDB).filter_by(user_id=current_user.id, is_active=True).all()
-
-        if not refresh_tokens:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No active refresh tokens found")
-
-        db.query(RefreshTokenDB).filter_by(user_id=current_user.id, is_active=True).update({"is_active": False})
+        db.query(RefreshTokenDB).filter_by(user_id=current_user.id, is_active=True).update(
+            {"is_active": False, "revoked": True}
+        )
         db.commit()
-
         return {"detail": "Logged out successfully"}
-    except Exception as e:
+    except SQLAlchemyError as e:
         db.rollback()
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Logout failed: {str(e)}")
+        logger.error(f"Logout failed for user {current_user.id}: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Logout failed")
+
+
+@router.get("/ws-ticket")
+def get_ws_ticket(current_user: UserDB = Depends(get_current_user)):
+    """Issue a short-lived, single-purpose ticket for authenticating a WebSocket handshake.
+
+    The long-lived access token is never exposed to client-side JavaScript; the browser
+    requests one of these tickets (valid for seconds) right before opening the socket.
+    """
+    return {"ticket": create_ws_ticket(current_user.id)}
 
 @router.get("/me", response_model=UserResponse)
 async def get_my_profile(current_user: UserDB = Depends(get_current_user)):
@@ -159,6 +174,9 @@ async def upload_avatar(
     contents = await file.read()
     if len(contents) > MAX_AVATAR_SIZE:
         raise HTTPException(status_code=413, detail="File too large. Maximum size is 10MB.")
+    # Verify the bytes are actually an image, not a mislabeled payload.
+    if not is_valid_image(contents):
+        raise HTTPException(status_code=400, detail="Uploaded file is not a valid image")
     with open(path, "wb") as f:
         f.write(contents)
     avatar_url = f"/media/{filename}"
@@ -167,12 +185,141 @@ async def upload_avatar(
     db.refresh(current_user)
     return current_user
 
+@router.get("/me/notification-prefs", response_model=NotificationPrefs)
+async def get_notification_prefs(current_user: UserDB = Depends(get_current_user)):
+    return current_user
+
+
+@router.put("/me/notification-prefs", response_model=NotificationPrefs)
+async def update_notification_prefs(
+    prefs: NotificationPrefs,
+    current_user: UserDB = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    current_user.notify_likes = prefs.notify_likes
+    current_user.notify_comments = prefs.notify_comments
+    current_user.notify_follows = prefs.notify_follows
+    db.commit()
+    db.refresh(current_user)
+    return current_user
+
+
 @router.get("/{username}/profile", response_model=UserPublicProfile)
-async def get_public_profile(username: str, db: Session = Depends(get_db)):
+async def get_public_profile(
+    username: str,
+    db: Session = Depends(get_db),
+    current_user: Optional[UserDB] = Depends(get_optional_user),
+):
     user = get_user_by_username(db, username)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    return user
+
+    profile = UserPublicProfile.model_validate(user)
+    profile.followers_count = db.query(FollowDB).filter(FollowDB.followed_id == user.id).count()
+    profile.following_count = db.query(FollowDB).filter(FollowDB.follower_id == user.id).count()
+    profile.articles_count = (
+        db.query(ArticleDB)
+        .filter(ArticleDB.author_id == user.id, ArticleDB.status == ArticleStatus.PUBLISHED)
+        .count()
+    )
+    if current_user is not None:
+        profile.is_followed_by_me = (
+            db.query(FollowDB)
+            .filter(FollowDB.follower_id == current_user.id, FollowDB.followed_id == user.id)
+            .first()
+            is not None
+        )
+    return profile
+
+
+@router.post("/{username}/follow", status_code=status.HTTP_200_OK)
+async def follow_user(
+    username: str,
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user),
+):
+    """Follow another user."""
+    target = get_user_by_username(db, username)
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+    if target.id == current_user.id:
+        raise HTTPException(status_code=400, detail="You cannot follow yourself")
+
+    try:
+        db.add(FollowDB(follower_id=current_user.id, followed_id=target.id))
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Already following this user")
+
+    try:
+        await send_notification_to_user(
+            db=db,
+            user_id=target.id,
+            message=f"{current_user.username} started following you",
+            notif_type="follow",
+            extra_data={"follower_username": current_user.username},
+        )
+    except Exception:
+        pass  # notification failure must not fail the follow
+
+    followers = db.query(FollowDB).filter(FollowDB.followed_id == target.id).count()
+    return {"detail": f"Now following {target.username}", "followers_count": followers}
+
+
+@router.delete("/{username}/follow", status_code=status.HTTP_200_OK)
+async def unfollow_user(
+    username: str,
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user),
+):
+    """Unfollow a user."""
+    target = get_user_by_username(db, username)
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    follow = db.query(FollowDB).filter(
+        FollowDB.follower_id == current_user.id, FollowDB.followed_id == target.id
+    ).one_or_none()
+    if follow is None:
+        raise HTTPException(status_code=400, detail="You are not following this user")
+
+    db.delete(follow)
+    db.commit()
+    followers = db.query(FollowDB).filter(FollowDB.followed_id == target.id).count()
+    return {"detail": f"Unfollowed {target.username}", "followers_count": followers}
+
+
+@router.get("/{username}/followers", response_model=List[FollowUserEntry])
+async def list_followers(username: str, db: Session = Depends(get_db), skip: int = 0, limit: int = 50):
+    """Users who follow the given user."""
+    user = get_user_by_username(db, username)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    limit = min(100, max(1, limit))
+    rows = (
+        db.query(UserDB)
+        .join(FollowDB, FollowDB.follower_id == UserDB.id)
+        .filter(FollowDB.followed_id == user.id)
+        .offset(skip).limit(limit).all()
+    )
+    return rows
+
+
+@router.get("/{username}/following", response_model=List[FollowUserEntry])
+async def list_following(username: str, db: Session = Depends(get_db), skip: int = 0, limit: int = 50):
+    """Users the given user follows."""
+    user = get_user_by_username(db, username)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    limit = min(100, max(1, limit))
+    rows = (
+        db.query(UserDB)
+        .join(FollowDB, FollowDB.followed_id == UserDB.id)
+        .filter(FollowDB.follower_id == user.id)
+        .offset(skip).limit(limit).all()
+    )
+    return rows
 
 
 @router.get("/{username}/articles", response_model=List[ArticleResponse])

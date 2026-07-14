@@ -14,8 +14,8 @@ class LikeDB(Base):
         UniqueConstraint("user_id", "article_id", name="unique_like"),
     )
 
-    article = relationship("ArticleDB", back_populates="likes", passive_deletes=True, lazy="joined")
-    user = relationship("UserDB", back_populates="likes", passive_deletes=True, lazy="joined")
+    article = relationship("ArticleDB", back_populates="likes", passive_deletes=True)
+    user = relationship("UserDB", back_populates="likes", passive_deletes=True)
 
     def __repr__(self):
         return f"<LikeDB user_id={self.user_id or 'N/A'} article_id={self.article_id or 'N/A'}>"
