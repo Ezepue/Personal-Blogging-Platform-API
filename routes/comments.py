@@ -11,6 +11,7 @@ from utils.db_helpers import (
 )
 from utils.notification_helper import send_notification_to_user
 from models.user import UserDB
+from models.article import ArticleDB
 
 # Logger setup
 logger = logging.getLogger(__name__)
@@ -73,24 +74,21 @@ def remove_comment(
     db: Session = Depends(get_db),
     current_user: UserDB = Depends(get_current_user)
 ):
-    """Allow authors of the article, comment owners, and admins to delete comments."""
+    """Allow the comment owner, the article's author, and admins to delete a comment."""
 
     comment = get_comment_by_id(db, comment_id)
-    if not comment:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found")
 
-    # Ensure permission for deletion
-    if comment.user_id == current_user.id or is_admin(current_user):
-        delete_comment(db, comment_id, current_user)
-        logger.info(f"User {current_user.id} deleted comment {comment_id} on article ID {comment.article_id}")
-        return {"status": "success", "detail": f"Comment {comment_id} deleted successfully"}
+    is_owner = comment.user_id == current_user.id
+    article = db.query(ArticleDB).filter(ArticleDB.id == comment.article_id).first()
+    is_article_author = article is not None and article.author_id == current_user.id
 
-    # Fetch article only if needed
-    article = get_article_by_id(db, comment.article_id)
-    if article and article.author_id == current_user.id:
-        delete_comment(db, comment_id, current_user)
-        logger.info(f"Article author {current_user.id} deleted comment {comment_id} on their article '{article.title}'")
-        return {"status": "success", "detail": f"Comment {comment_id} deleted successfully"}
+    if not (is_owner or is_article_author or is_admin(current_user)):
+        logger.warning(f"User {current_user.id} attempted to delete comment {comment_id} without permission.")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to delete this comment",
+        )
 
-    logger.warning(f"User {current_user.id} attempted to delete comment {comment_id} on article ID {comment.article_id} without permission.")
-    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You do not have permission to delete this comment")
+    delete_comment(db, comment_id)
+    logger.info(f"User {current_user.id} deleted comment {comment_id} on article ID {comment.article_id}")
+    return {"status": "success", "detail": f"Comment {comment_id} deleted successfully"}

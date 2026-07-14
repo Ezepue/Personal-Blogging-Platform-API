@@ -75,8 +75,15 @@ export default function WritePage() {
         const article = await res.json();
         localStorage.removeItem(DRAFT_KEY);
         if (publish) {
-          await fetch(`/api/articles/${article.id}/publish`, { method: "PUT" });
-          router.push(`/posts/${article.id}`);
+          const pub = await fetch(`/api/articles/${article.id}/publish`, { method: "PUT" });
+          if (pub.ok) {
+            router.push(`/posts/${article.id}`);
+          } else {
+            // Publish failed: keep the user on the draft editor rather than routing
+            // to a post that isn't visible yet.
+            setError("Saved as draft, but publishing failed. Try publishing again.");
+            router.push(`/write/${article.id}`);
+          }
         } else {
           // Stay on the edit page for drafts so the user can continue editing
           router.push(`/write/${article.id}`);

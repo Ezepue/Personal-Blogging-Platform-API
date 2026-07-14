@@ -72,5 +72,5 @@ class UserPublicProfile(BaseModel):
     username: str
     bio: Optional[str] = None
     avatar_url: Optional[str] = None
-    role: str
+    role: UserRole
     model_config = ConfigDict(from_attributes=True)

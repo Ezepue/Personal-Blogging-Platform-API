@@ -1,9 +1,13 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
-from utils.auth_helpers import get_current_user
+from fastapi.responses import FileResponse
+from utils.auth_helpers import get_current_user, require_admin
+from utils.file_validation import detect_file_type
 from models.user import UserDB
+from config import UPLOAD_FOLDER
 
 import shutil
 import os
+import mimetypes
 import logging
 from pathlib import Path
 import uuid
@@ -11,13 +15,18 @@ import uuid
 router = APIRouter()
 
 # Configure logging
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
-# Define the upload directory
-UPLOAD_DIR = Path("uploads")
+# Define the upload directory (shared with avatar uploads via config.UPLOAD_FOLDER)
+UPLOAD_DIR = Path(UPLOAD_FOLDER)
 MAX_FILE_SIZE_MB = 10  # Maximum allowed file size in MB
+MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".pdf", ".mp4"}
+# Detected (magic-byte) MIME types we accept.
+ALLOWED_MIME_TYPES = {
+    "image/jpeg", "image/png", "image/gif", "image/webp",
+    "application/pdf", "video/mp4",
+}
 
 def ensure_upload_dir():
     """Ensure the upload directory exists before use."""
@@ -36,18 +45,8 @@ def get_unique_filename(filename: str) -> str:
 
     return f"{uuid.uuid4().hex}{extension}"
 
-def validate_file_size(file: UploadFile):
-    """Ensure the uploaded file is within the allowed size limit."""
-    file.file.seek(0, os.SEEK_END)
-    file_size = file.file.tell()
-    file.file.seek(0)
-
-    max_size_bytes = MAX_FILE_SIZE_MB * 1024 * 1024
-    if file_size > max_size_bytes:
-        raise HTTPException(status_code=413, detail=f"File size exceeds {MAX_FILE_SIZE_MB}MB limit")
-
 def validate_and_sanitize_filename(filename: str) -> Path:
-    """Sanitize and return a safe file path."""
+    """Sanitize and return a safe file path within the upload directory."""
     # Prevent directory traversal attack (../)
     safe_filename = Path(filename).name
     return UPLOAD_DIR / safe_filename
@@ -59,26 +58,33 @@ async def upload_file(
 ):
     """Handles secure media file uploads (Authenticated Users Only)."""
     ensure_upload_dir()
-    validate_file_size(file)
 
     filename = get_unique_filename(file.filename)
-    file_location = UPLOAD_DIR / filename
 
+    contents = await file.read()
+    if len(contents) > MAX_FILE_SIZE_BYTES:
+        raise HTTPException(status_code=413, detail=f"File size exceeds {MAX_FILE_SIZE_MB}MB limit")
+
+    # Trust the bytes, not the declared content-type/extension.
+    detected = detect_file_type(contents)
+    if detected not in ALLOWED_MIME_TYPES:
+        raise HTTPException(status_code=400, detail="File content does not match an allowed type")
+
+    file_location = UPLOAD_DIR / filename
     try:
         with file_location.open("wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-
+            buffer.write(contents)
         logger.info(f"User {current_user.id} uploaded file: {file_location}")
     except Exception as e:
         logger.error(f"File upload failed: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"File upload failed: {str(e)}")
+        raise HTTPException(status_code=500, detail="File upload failed")
 
     return {"filename": filename, "url": f"/media/{filename}"}
 
 
 @router.get("/files/")
-def list_files(current_user: UserDB = Depends(get_current_user)):
-    """Returns a list of uploaded files."""
+def list_files(current_user: UserDB = Depends(require_admin)):
+    """Returns a list of uploaded files (admins only)."""
     ensure_upload_dir()
 
     try:
@@ -86,26 +92,43 @@ def list_files(current_user: UserDB = Depends(get_current_user)):
         return {"files": files}
     except Exception as e:
         logger.error(f"Could not list files: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Could not list files: {str(e)}")
+        raise HTTPException(status_code=500, detail="Could not list files")
 
 @router.delete("/delete/{filename}")
 def delete_file(
     filename: str,
-    current_user: UserDB = Depends(get_current_user)  # Requires authentication
+    current_user: UserDB = Depends(require_admin)  # Admins only
 ):
-    """Delete an uploaded file (Authenticated Users Only)."""
+    """Delete an uploaded file (admins only)."""
     ensure_upload_dir()
 
     file_path = validate_and_sanitize_filename(filename)
 
     if not file_path.exists() or not file_path.is_file():
-        logger.warning(f"User {current_user.id} attempted to delete non-existent file: {file_path}")
+        logger.warning(f"Admin {current_user.id} attempted to delete non-existent file: {file_path}")
         raise HTTPException(status_code=404, detail="File not found")
 
     try:
         file_path.unlink()
-        logger.info(f"User {current_user.id} deleted file: {file_path}")
+        logger.info(f"Admin {current_user.id} deleted file: {file_path}")
         return {"detail": f"File {filename} deleted successfully"}
     except Exception as e:
         logger.error(f"Failed to delete file {filename}: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Could not delete file: {str(e)}")
+        raise HTTPException(status_code=500, detail="Could not delete file")
+
+
+@router.get("/{filename}")
+def serve_file(filename: str):
+    """Serve an uploaded media file (public). Sent with an explicit content type;
+    combined with the app-wide X-Content-Type-Options: nosniff header this prevents
+    a mislabeled file from being interpreted as HTML/script by the browser."""
+    file_path = validate_and_sanitize_filename(filename)
+    if not file_path.exists() or not file_path.is_file():
+        raise HTTPException(status_code=404, detail="File not found")
+
+    media_type, _ = mimetypes.guess_type(str(file_path))
+    return FileResponse(
+        path=str(file_path),
+        media_type=media_type or "application/octet-stream",
+        headers={"Content-Disposition": f'inline; filename="{file_path.name}"'},
+    )

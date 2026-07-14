@@ -21,6 +21,16 @@ type NotificationContextValue = {
 
 const NotificationContext = createContext<NotificationContextValue | null>(null);
 
+function defaultWsBaseUrl(): string {
+  if (process.env.NEXT_PUBLIC_WS_URL) return process.env.NEXT_PUBLIC_WS_URL;
+  // Derive from the current origin so an HTTPS page uses wss:// (avoids mixed content).
+  if (typeof window !== "undefined") {
+    const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
+    return `${proto}//${window.location.hostname}:8000`;
+  }
+  return "ws://localhost:8000";
+}
+
 export function NotificationProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -43,29 +53,57 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     fetchNotifications();
 
     let cancelled = false;
+    let attempts = 0;
+
+    const scheduleReconnect = () => {
+      if (cancelled) return;
+      // Exponential backoff capped at 30s.
+      const delay = Math.min(30000, 1000 * 2 ** attempts);
+      attempts += 1;
+      reconnectRef.current = setTimeout(connectWs, delay);
+    };
 
     const connectWs = async () => {
-      const tokenRes = await fetch("/api/auth/token-for-ws");
-      if (!tokenRes.ok || cancelled) return;
-      const { token } = (await tokenRes.json()) as { token: string };
+      if (cancelled) return;
+      let token: string;
+      try {
+        const tokenRes = await fetch("/api/auth/token-for-ws");
+        if (!tokenRes.ok || cancelled) {
+          scheduleReconnect();
+          return;
+        }
+        ({ token } = (await tokenRes.json()) as { token: string });
+      } catch {
+        scheduleReconnect();
+        return;
+      }
       if (cancelled) return;
 
-      const wsBaseUrl = process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:8000";
-      const ws = new WebSocket(`${wsBaseUrl}/notification/ws/${user.id}?token=${token}`);
+      const ws = new WebSocket(`${defaultWsBaseUrl()}/notification/ws/${user.id}?token=${token}`);
       wsRef.current = ws;
+
+      ws.onopen = () => {
+        attempts = 0; // reset backoff on a successful connection
+      };
 
       ws.onmessage = (e) => {
         try {
           const notif: Notification = JSON.parse(e.data as string);
-          setNotifications((prev) => [notif, ...prev]);
+          setNotifications((prev) =>
+            prev.some((n) => n.id === notif.id) ? prev : [notif, ...prev]
+          );
         } catch {
           // ignore malformed messages
         }
       };
 
+      ws.onerror = () => {
+        // onclose will fire next and handle reconnection.
+        ws.close();
+      };
+
       ws.onclose = () => {
-        if (cancelled) return;
-        reconnectRef.current = setTimeout(connectWs, 5000);
+        scheduleReconnect();
       };
     };
 

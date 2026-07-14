@@ -1,1 +1,22 @@
+# Environment / secrets
 .env
+.env.*
+!.env.example
+
+# Python
+venv/
+.venv/
+env/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# Uploads (runtime user content)
+uploads/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/

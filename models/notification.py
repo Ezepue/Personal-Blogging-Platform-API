@@ -14,7 +14,7 @@ class NotificationDB(Base):
     extra_data = Column(JSON, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
 
-    user = relationship("UserDB", back_populates="notifications", passive_deletes=True, lazy="joined")
+    user = relationship("UserDB", back_populates="notifications", passive_deletes=True)
 
     def __repr__(self):
         return f"<NotificationDB user_id={self.user_id or 'N/A'}, message={self.message[:30]}..., is_read={self.is_read}>"

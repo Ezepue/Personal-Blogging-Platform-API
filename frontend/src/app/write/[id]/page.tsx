@@ -66,8 +66,12 @@ export default function EditPage({ params }: { params: { id: string } }) {
         }),
       });
       if (res.ok) {
-        if (publish && status !== "PUBLISHED") {
-          await fetch(`/api/articles/${id}/publish`, { method: "PUT" });
+        if (publish && status.toUpperCase() !== "PUBLISHED") {
+          const pub = await fetch(`/api/articles/${id}/publish`, { method: "PUT" });
+          if (!pub.ok) {
+            setError("Saved, but publishing failed. Try publishing again.");
+            return;
+          }
         }
         router.push(`/posts/${id}`);
       } else {
@@ -129,7 +133,7 @@ export default function EditPage({ params }: { params: { id: string } }) {
           disabled={saving}
           className="px-5 py-2.5 bg-accent hover:bg-accent-hover text-white rounded-lg font-medium transition-colors disabled:opacity-50"
         >
-          {saving ? "Saving…" : status === "PUBLISHED" ? "Update" : "Publish"}
+          {saving ? "Saving…" : status.toUpperCase() === "PUBLISHED" ? "Update" : "Publish"}
         </button>
       </div>
     </div>

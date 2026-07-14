@@ -3,9 +3,8 @@ from typing import Optional
 
 class LikeResponse(BaseModel):
     message: str
-    user_id: int = Field(..., gt=0, description="User who liked the article")
     article_id: int = Field(..., gt=0, description="Liked article ID")
-    user_id: Optional[int] = None
-    likes_count: int
+    user_id: Optional[int] = Field(None, description="User who liked the article, if applicable")
+    likes_count: int = Field(..., ge=0)
 
     model_config = ConfigDict(from_attributes=True)

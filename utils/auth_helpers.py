@@ -26,7 +26,13 @@ REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", 7))
 
 # Security Utilities
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="users/login", scopes={"admin": "Admin privileges"})
+# Optional variant that does not raise when no credentials are supplied — used by
+# public endpoints that behave differently for authenticated users.
+oauth2_scheme_optional = OAuth2PasswordBearer(tokenUrl="users/login", auto_error=False)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+# Short-lived, single-purpose token used only to authenticate a WebSocket handshake.
+WS_TICKET_EXPIRE_SECONDS = 60
 
 # Logging setup
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
@@ -64,6 +70,17 @@ def verify_access_token(token: str) -> Optional[dict]:
     except JWTError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
+def create_ws_ticket(user_id: int) -> str:
+    """Create a short-lived token used solely to authenticate a WebSocket handshake.
+
+    The full access token is never exposed to client-side JavaScript. This ticket is
+    valid for a few seconds and only accepted by the WebSocket endpoint, which limits
+    the blast radius if it leaks (e.g. via URL/proxy logs).
+    """
+    expire = datetime.utcnow() + timedelta(seconds=WS_TICKET_EXPIRE_SECONDS)
+    to_encode = {"sub": str(user_id), "token_type": "ws", "exp": expire}
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
 def create_refresh_token(user_id: int, db: Session) -> str:
     try:
         refresh_token = secrets.token_urlsafe(64)
@@ -88,6 +105,9 @@ def verify_refresh_token(refresh_token: str, db: Session) -> Optional[int]:
     if db_token.revoked:
         logger.info(f"Refresh token {refresh_token} has been revoked.")
         return None
+    if not db_token.is_active:
+        logger.info(f"Refresh token {refresh_token} is inactive (logged out).")
+        return None
     if db_token.expires_at < datetime.utcnow():
         logger.info(f"Refresh token {refresh_token} expired at {db_token.expires_at}.")
         return None
@@ -109,15 +129,49 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
         if not user_id:
             logger.warning("Token missing 'sub' field.")
             raise credentials_exception
-        user = db.query(UserDB).filter(UserDB.id == int(user_id)).first()
-        if user is None:
-            logger.warning(f"Authentication failed: User {user_id} not found")
+        # Only genuine access tokens may authenticate API requests. This rejects
+        # refresh tokens and short-lived WebSocket tickets presented as bearer tokens.
+        if payload.get("token_type") != "access":
+            logger.warning("Token is not an access token.")
             raise credentials_exception
-    except JWTError as e:
+        user = db.query(UserDB).filter(UserDB.id == int(user_id)).first()
+    except (JWTError, ValueError) as e:
         logger.warning(f"JWT decoding failed: {e}")
         raise credentials_exception
 
+    if user is None:
+        logger.warning(f"Authentication failed: User {user_id} not found")
+        raise credentials_exception
+    if not user.is_active:
+        logger.warning(f"Authentication failed: User {user_id} is deactivated")
+        raise credentials_exception
+
     logger.info(f"User {user.username} authenticated successfully")
+    return user
+
+def get_optional_user(
+    token: Optional[str] = Depends(oauth2_scheme_optional),
+    db: Session = Depends(get_db),
+) -> Optional[UserDB]:
+    """Return the authenticated user if a valid access token is present, else None.
+
+    Never raises on missing/invalid credentials — used by public endpoints that
+    reveal extra data (e.g. their own drafts) to signed-in users.
+    """
+    if not token:
+        return None
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("token_type") != "access":
+            return None
+        user_id = payload.get("sub")
+        if not user_id:
+            return None
+        user = db.query(UserDB).filter(UserDB.id == int(user_id)).first()
+    except (JWTError, ValueError):
+        return None
+    if user is None or not user.is_active:
+        return None
     return user
 
 def verify_user_credentials(db: Session, username: str, password: str) -> Optional[UserDB]:
@@ -173,33 +227,24 @@ def delete_expired_tokens(db: Session):
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error")
 
 # Role-based Access Control
-def is_admin(user: UserDB):
-    """Check if the user is an admin."""
-    logger.info(f"Checking admin access for user {user.username}, role: {user.role}")
+def is_admin(user: UserDB) -> bool:
+    """Return True if the user is an admin or super admin (pure predicate, never raises)."""
+    return user.role in {UserRole.ADMIN, UserRole.SUPER_ADMIN}
 
-    if user.role not in {UserRole.ADMIN, UserRole.SUPER_ADMIN}:  # Use Enum
-        logger.warning(f"Access denied: User {user.username} (role: {user.role}) is not an admin.")
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin access required"
-        )
+def is_super_admin(user: UserDB) -> bool:
+    """Return True if the user is a super admin (pure predicate, never raises)."""
+    return user.role == UserRole.SUPER_ADMIN
 
-    logger.info(f"User {user.username} granted admin access.")
-    return True
+def require_admin(current_user: UserDB = Depends(get_current_user)) -> UserDB:
+    """FastAPI dependency that admits only admins / super admins."""
+    if not is_admin(current_user):
+        logger.warning(f"Access denied: User {current_user.username} (role: {current_user.role}) is not an admin.")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
+    return current_user
 
-def is_super_admin(user: UserDB):
-    """Check if the user is a super admin."""
-    logger.info(f"Checking super admin access for user {user.username}, role: {user.role}")
-
-    if user.role != UserRole.SUPER_ADMIN:  # Use Enum comparison
-        logger.warning(f"Access denied: User {user.username} (role: {user.role}) is not a super admin.")
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Super admin access required"
-        )
-
-    logger.info(f"User {user.username} granted super admin access.")
-    return True
-
-# Logging Configuration (to be called in main.py or the entry point)
-logging.basicConfig(level=logging.INFO)
+def require_super_admin(current_user: UserDB = Depends(get_current_user)) -> UserDB:
+    """FastAPI dependency that admits only super admins."""
+    if not is_super_admin(current_user):
+        logger.warning(f"Access denied: User {current_user.username} (role: {current_user.role}) is not a super admin.")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Super admin access required")
+    return current_user

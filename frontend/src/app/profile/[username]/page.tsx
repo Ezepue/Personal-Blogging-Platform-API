@@ -1,5 +1,4 @@
 import { notFound } from "next/navigation";
-import PostCard from "@/components/PostCard";
 import ProfileDraftsTab from "@/components/ProfileDraftsTab";
 import type { Metadata } from "next";
 

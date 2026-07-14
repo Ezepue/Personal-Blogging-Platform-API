@@ -1,7 +1,7 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
 from sqlalchemy.orm import Session
 from models.notification import NotificationDB
-from utils.notification_helper import fetch_unread_notifications
+from utils.notification_helper import fetch_unread_notifications, serialize_notification
 from websocket_manager import websocket_manager
 from database import get_db
 from utils.auth_helpers import get_current_user
@@ -17,10 +17,19 @@ logger = logging.getLogger(__name__)
 
 @router.websocket("/ws/{user_id}")
 async def websocket_endpoint(websocket: WebSocket, user_id: int, token: str = Query(...)):
-    """WebSocket endpoint with authentication."""
-    # Verify the token before allowing connection
-    user_data = verify_access_token(token)
-    if not user_data or user_data.get("user_id") != user_id:
+    """WebSocket endpoint authenticated by a short-lived ticket (or access token)."""
+    # Verify the token and confirm it belongs to the user_id in the path.
+    try:
+        user_data = verify_access_token(token)
+    except HTTPException:
+        user_data = None
+
+    valid = (
+        user_data is not None
+        and user_data.get("token_type") in {"ws", "access"}
+        and str(user_data.get("sub")) == str(user_id)
+    )
+    if not valid:
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return
 
@@ -30,14 +39,19 @@ async def websocket_endpoint(websocket: WebSocket, user_id: int, token: str = Qu
         while True:
             data = await websocket.receive_text()
             if data == "get_notifications":
-                db = next(get_db())
-                notifications = fetch_unread_notifications(db, user_id, 0, 10)
-                await websocket.send_json({"notifications": notifications})
+                db_gen = get_db()
+                db = next(db_gen)
+                try:
+                    notifications = fetch_unread_notifications(db, user_id, 0, 10)
+                    payload = [serialize_notification(n) for n in notifications]
+                finally:
+                    db_gen.close()
+                await websocket.send_json({"notifications": payload})
             else:
                 await websocket.send_text(f"Received unknown command: {data}")
 
     except WebSocketDisconnect:
-        websocket_manager.disconnect(user_id)
+        await websocket_manager.disconnect(user_id)
 
 @router.get("/unread", response_model=list)
 def get_unread_notifications(

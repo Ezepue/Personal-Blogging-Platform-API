@@ -9,12 +9,21 @@ from config import FRONTEND_URL
 from models.article import ArticleDB
 from models.enums import ArticleStatus
 from schemas.article import ArticleCreate, ArticleUpdate, ArticleResponse
-from utils.auth_helpers import get_current_user, is_admin
+from utils.auth_helpers import get_current_user, get_optional_user, is_admin
 from utils.db_helpers import (
     create_new_article, get_article_by_id,
     update_article, delete_article, get_articles, get_user_drafts
 )
 from models.user import UserDB
+
+
+def _can_view_article(article: ArticleDB, user: Optional[UserDB]) -> bool:
+    """Published articles are public; drafts/deleted are visible only to the author or an admin."""
+    if article.status == ArticleStatus.PUBLISHED:
+        return True
+    if user is None:
+        return False
+    return article.author_id == user.id or is_admin(user)
 
 # Logger setup
 logging.basicConfig(level=logging.INFO)
@@ -53,16 +62,21 @@ def list_articles(
     category: Optional[str] = None,
     skip: int = 0,
     limit: int = 10,
-    status: Optional[ArticleStatus] = ArticleStatus.PUBLISHED,
 ):
-    """ Fetch articles. Defaults to PUBLISHED only; pass status=DRAFT to filter drafts. """
+    """ Fetch the public feed. Only PUBLISHED articles are returned.
+
+    Drafts are private and served exclusively via /articles/my-drafts (own drafts)
+    or /admin/articles (admins). This endpoint never exposes other users' drafts. """
 
     # Restrict pagination limits
     limit = min(50, max(1, limit))
 
-    articles = get_articles(db, search=search, category=category, skip=skip, limit=limit, status=status)
+    articles = get_articles(
+        db, search=search, category=category, skip=skip, limit=limit,
+        status=ArticleStatus.PUBLISHED,
+    )
 
-    logger.info(f"Fetched {len(articles)} articles (Search: '{search}', Category: '{category}', Status: '{status}').")
+    logger.info(f"Fetched {len(articles)} published articles (Search: '{search}', Category: '{category}').")
 
     return articles or []
 
@@ -75,17 +89,21 @@ def list_my_drafts(
     limit: int = 50,
 ):
     """ Return all DRAFT articles belonging to the authenticated user. """
-    is_author_or_above(current_user)
     limit = min(100, max(1, limit))
     drafts = get_user_drafts(db, author_id=current_user.id, skip=skip, limit=limit)
     logger.info(f"User {current_user.id} fetched {len(drafts)} drafts.")
     return drafts or []
 
 @router.get("/{article_id}", response_model=ArticleResponse)
-def read_article(article_id: int, db: Session = Depends(get_db)):
-    """ Retrieve a specific article by its ID. """
+def read_article(
+    article_id: int,
+    db: Session = Depends(get_db),
+    current_user: Optional[UserDB] = Depends(get_optional_user),
+):
+    """ Retrieve a specific article by its ID. Drafts/deleted are private. """
     article = get_article_by_id(db, article_id)
-    if not article:
+    if not _can_view_article(article, current_user):
+        # 404 rather than 403 so we don't reveal that a draft/deleted article exists.
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Article not found")
 
     logger.info(f"Article '{article.title}' (ID: {article_id}) retrieved.")
@@ -144,10 +162,14 @@ def delete_existing_article(
 
 # Share
 @router.get("/{article_id}/share")
-def share_article(article_id: int, db: Session = Depends(get_db)):
+def share_article(
+    article_id: int,
+    db: Session = Depends(get_db),
+    current_user: Optional[UserDB] = Depends(get_optional_user),
+):
     article = db.query(ArticleDB).filter(ArticleDB.id == article_id).first()
-    if not article:
-        logger.warning(f"Article with ID {article_id} not found.")
+    if not article or not _can_view_article(article, current_user):
+        logger.warning(f"Article with ID {article_id} not found or not viewable.")
         raise HTTPException(status_code=404, detail="Article not found")
 
     share_url = f"{FRONTEND_URL}/posts/{article_id}"

@@ -79,7 +79,8 @@ export default async function PostPage({
         </div>
       </div>
 
-      {/* Content - NOTE: In production, sanitize with DOMPurify before rendering */}
+      {/* Content is sanitized server-side (utils/sanitize.py) at write time, so the
+          stored HTML is safe to render here. */}
       <div
         className="prose prose-invert prose-lg max-w-none mb-12
           prose-headings:text-[#f1f1f5]

@@ -9,14 +9,14 @@ from schemas.comment import CommentResponse
 from models.enums import UserRole
 from models.refresh_token import RefreshTokenDB
 from schemas.user import UserResponse, PromoteUserRequest
-from utils.auth_helpers import get_current_user, is_admin, is_super_admin
+from utils.auth_helpers import require_admin, require_super_admin
 from utils.db_helpers import (
     get_all_users, promote_user, delete_article, delete_comment,
     get_articles, get_all_comments, get_article_by_id, get_comment_by_id,
     get_user_by_id, update_user_role, delete_user_from_db
 )
 from models.user import UserDB
-from schemas.token import RefreshTokenResponse  # Assuming you have this schema
+from schemas.token import RefreshTokenResponse
 
 # Logger setup
 logger = logging.getLogger(__name__)
@@ -26,11 +26,9 @@ router = APIRouter()
 @router.get("/users", response_model=List[UserResponse])
 def list_users(
     db: Session = Depends(get_db),
-    current_user: UserDB = Depends(get_current_user)
+    current_user: UserDB = Depends(require_super_admin)
 ):
     """ Super admins can view all users. """
-    is_super_admin(current_user)  # This will raise HTTPException if unauthorized
-
     users = get_all_users(db)
     logger.info(f"Super Admin {current_user.id} retrieved {len(users)} users.")
     return users
@@ -40,11 +38,9 @@ def promote_to_admin(
     user_id: int,
     role: str,  # Expecting "admin" or "super_admin"
     db: Session = Depends(get_db),
-    current_user: UserDB = Depends(get_current_user)
+    current_user: UserDB = Depends(require_super_admin)
 ):
     """ Super admins can promote users to admin or super admin. """
-    is_super_admin(current_user)  # Raise HTTPException if not super admin
-
     # Validate role
     new_role = UserRole.__members__.get(role.upper())
     if not new_role:
@@ -53,11 +49,11 @@ def promote_to_admin(
             detail="Invalid role. Choose 'admin' or 'super_admin'."
         )
 
-    # Prevent promoting a super admin to another super admin
-    if new_role == UserRole.SUPER_ADMIN and current_user.id == user_id:
+    # Prevent promoting yourself
+    if current_user.id == user_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="A super admin cannot promote themselves."
+            detail="You cannot change your own role."
         )
 
     promote_user(db, user_id, new_role)
@@ -69,16 +65,10 @@ def change_user_role(
     user_id: int,
     request: PromoteUserRequest,
     db: Session = Depends(get_db),
-    current_user: UserDB = Depends(get_current_user)
+    current_user: UserDB = Depends(require_super_admin)
 ):
     """Allow only Super Admins to change user roles."""
-    if not is_super_admin(current_user):
-        raise HTTPException(status_code=403, detail="Only Super Admins can perform this action.")
-
     db_user = get_user_by_id(db, user_id)
-    if not db_user:
-        logger.error(f"User with id {user_id} not found")
-        raise HTTPException(status_code=404, detail="User not found")
 
     role_str = request.new_role.value.upper()  # Ensure correct case handling
     if role_str not in UserRole.__members__:
@@ -103,12 +93,10 @@ def change_user_role(
 @router.get("/articles", response_model=List[ArticleResponse])
 def list_all_articles(
     db: Session = Depends(get_db),
-    current_user: UserDB = Depends(get_current_user)
+    current_user: UserDB = Depends(require_admin)
 ):
-    """ Admins can view all articles. """
-    is_admin(current_user)  # This will raise HTTPException if unauthorized
-
-    articles = get_articles(db)
+    """ Admins can view all articles regardless of status. """
+    articles = get_articles(db, status=None, limit=100)
     logger.info(f"Admin {current_user.id} retrieved {len(articles)} articles.")
     return articles
 
@@ -116,15 +104,10 @@ def list_all_articles(
 def remove_article(
     article_id: int,
     db: Session = Depends(get_db),
-    current_user: UserDB = Depends(get_current_user)
+    current_user: UserDB = Depends(require_admin)
 ):
     """ Admins can delete any article. """
-    is_admin(current_user)  # This will raise HTTPException if unauthorized
-
     article = get_article_by_id(db, article_id)
-    if not article:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Article not found")
-
     delete_article(db, article_id)
     logger.info(f"Admin {current_user.id} deleted article '{article.title}' (ID: {article_id}).")
     return {"detail": f"Article '{article.title}' deleted successfully."}
@@ -132,11 +115,9 @@ def remove_article(
 @router.get("/comments", response_model=List[CommentResponse])
 def list_all_comments(
     db: Session = Depends(get_db),
-    current_user: UserDB = Depends(get_current_user)
+    current_user: UserDB = Depends(require_admin)
 ):
     """ Admins can view all comments. """
-    is_admin(current_user)  # This will raise HTTPException if unauthorized
-
     comments = get_all_comments(db)
     logger.info(f"Admin {current_user.id} retrieved {len(comments)} comments.")
     return comments
@@ -145,27 +126,20 @@ def list_all_comments(
 def remove_comment_admin(
     comment_id: int,
     db: Session = Depends(get_db),
-    current_user: UserDB = Depends(get_current_user)
+    current_user: UserDB = Depends(require_admin)
 ):
     """ Allow only admins and super admins to delete any comment. """
-    is_admin(current_user)  # Ensures only admins/super admins can delete
-
     comment = get_comment_by_id(db, comment_id)
-    if not comment:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found")
-
-    delete_comment(db, comment_id, current_user, allow_admin=True)
+    delete_comment(db, comment_id)
     logger.info(f"Admin {current_user.id} deleted comment '{comment.content[:30]}...' (ID: {comment_id}).")
     return {"detail": f"Comment '{comment.content[:30]}...' deleted successfully."}
 
 @router.get("/active-sessions", response_model=List[RefreshTokenResponse])
 def get_active_sessions(
     db: Session = Depends(get_db),
-    current_user: UserDB = Depends(get_current_user)
+    current_user: UserDB = Depends(require_admin)
 ):
     """ Admins can view active user sessions """
-    is_admin(current_user)
-
     sessions = db.query(RefreshTokenDB).filter(RefreshTokenDB.is_active == True).all()
     return sessions
 
@@ -173,11 +147,9 @@ def get_active_sessions(
 def revoke_token(
     token_id: int,
     db: Session = Depends(get_db),
-    current_user: UserDB = Depends(get_current_user)
+    current_user: UserDB = Depends(require_admin)
 ):
     """ Admins can revoke user sessions """
-    is_admin(current_user)
-
     token = db.query(RefreshTokenDB).filter_by(id=token_id).first()
     if not token:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Token not found")
@@ -191,19 +163,14 @@ def revoke_token(
 def delete_user(
     user_id: int,
     db: Session = Depends(get_db),
-    current_user: UserDB = Depends(get_current_user)
+    current_user: UserDB = Depends(require_super_admin)
 ):
     """Allow only Super Admins to delete users."""
-    if not is_super_admin(current_user):
-        logger.warning(f"User {current_user.username} attempted to delete a user without proper permissions.")
-        raise HTTPException(status_code=403, detail="Only Super Admins can perform this action.")
-
     db_user = get_user_by_id(db, user_id)
-    if not db_user:
-        logger.error(f"User with id {user_id} not found")
-        raise HTTPException(status_code=404, detail="User not found")
+
+    if db_user.id == current_user.id:
+        raise HTTPException(status_code=400, detail="You cannot delete your own account.")
 
     delete_user_from_db(db, user_id)
     logger.info(f"User {db_user.username} deleted successfully")
     return {"detail": f"User {db_user.username} deleted successfully"}
-

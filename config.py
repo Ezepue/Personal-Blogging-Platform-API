@@ -45,6 +45,11 @@ ALGORITHM = "HS256"
 # Upload Configuration
 UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", os.path.abspath("uploads"))
 FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
+
+# Trusted hosts for TrustedHostMiddleware. Comma-separated; defaults to "*" (allow all)
+# for local/dev convenience. Set this to your real domain(s) in production, e.g.
+# ALLOWED_HOSTS="example.com,www.example.com".
+ALLOWED_HOSTS = [h.strip() for h in os.getenv("ALLOWED_HOSTS", "*").split(",") if h.strip()]
 try:
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
     logger.info(f"Upload folder set to: {UPLOAD_FOLDER}")

@@ -24,12 +24,17 @@ services:
     build: .
     container_name: fastapi_app
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     environment:
       DATABASE_URL: postgresql://myuser:mypassword@db:5432/blogdb
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+      # Override SECRET_KEY in real deployments; this default only exists so the
+      # stack boots locally. The app fails fast if SECRET_KEY is unset.
+      SECRET_KEY: ${SECRET_KEY:-dev-only-secret-change-me-0123456789abcdef}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+      REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS:-7}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-*}
     ports:
       - "8000:8000"
     volumes:
