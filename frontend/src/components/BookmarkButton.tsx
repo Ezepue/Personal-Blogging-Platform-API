@@ -3,10 +3,12 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/components/ui/Toast";
 
 export default function BookmarkButton({ articleId }: { articleId: number }) {
   const { user } = useAuth();
   const router = useRouter();
+  const { toast } = useToast();
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -34,14 +36,27 @@ export default function BookmarkButton({ articleId }: { articleId: number }) {
     }
     if (busy) return;
     setBusy(true);
+    const wasSaved = saved;
     try {
       const res = await fetch(`/api/bookmarks/${articleId}`, {
-        method: saved ? "DELETE" : "POST",
+        method: wasSaved ? "DELETE" : "POST",
       });
-      if (res.ok) setSaved(!saved);
+      if (res.ok) {
+        setSaved(!wasSaved);
+        if (wasSaved) {
+          toast("Removed from reading list", "info", { label: "Undo", onClick: undo });
+        } else {
+          toast("Saved to reading list", "success");
+        }
+      }
     } finally {
       setBusy(false);
     }
+  };
+
+  const undo = async () => {
+    const res = await fetch(`/api/bookmarks/${articleId}`, { method: "POST" });
+    if (res.ok) setSaved(true);
   };
 
   return (

@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import ProfileDraftsTab from "@/components/ProfileDraftsTab";
 import FollowButton from "@/components/FollowButton";
+import VerifiedBadge from "@/components/VerifiedBadge";
 import type { Metadata } from "next";
 
 const API_URL = process.env.API_URL ?? "http://localhost:8000";
@@ -16,6 +17,8 @@ type Profile = {
   twitter?: string | null;
   github?: string | null;
   created_at?: string | null;
+  is_verified?: boolean;
+  pinned_article_id?: number | null;
   followers_count: number;
   following_count: number;
   articles_count: number;
@@ -101,24 +104,24 @@ export default async function ProfilePage({
           <FollowButton username={profile.username} />
         </div>
 
-        <h1 className="font-display text-4xl text-ink mb-1">{profile.username}</h1>
+        <h1 className="font-display text-4xl text-ink mb-1 flex items-center gap-2">
+          {profile.username}
+          {profile.is_verified && <VerifiedBadge className="[&>svg]:w-5 [&>svg]:h-5" />}
+        </h1>
         {profile.bio && <p className="text-ink-soft leading-relaxed max-w-xl mb-3">{profile.bio}</p>}
 
-        {/* Meta line: location, joined, links */}
+        {/* Meta line: location, joined, links, RSS */}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted mb-5">
           {profile.location && <span>📍 {profile.location}</span>}
           {joined && <span>Joined {joined}</span>}
           {links.map((l) => (
-            <a
-              key={l.href}
-              href={l.href}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-accent hover:underline"
-            >
+            <a key={l.href} href={l.href} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">
               {l.label}
             </a>
           ))}
+          <a href={`/api/rss/${profile.username}.xml`} className="text-accent hover:underline" title="RSS feed">
+            RSS
+          </a>
         </div>
 
         {/* Stats */}
@@ -140,7 +143,7 @@ export default async function ProfilePage({
 
       {/* Posts / drafts tabs */}
       <div className="fade-up fade-up-2">
-        <ProfileDraftsTab username={username} posts={posts} role={profile.role} />
+        <ProfileDraftsTab username={username} posts={posts} />
       </div>
     </div>
   );

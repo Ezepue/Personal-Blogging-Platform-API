@@ -9,10 +9,9 @@ type Props = {
   username: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   posts: any[];
-  role: string;
 };
 
-export default function ProfileDraftsTab({ username, posts, role }: Props) {
+export default function ProfileDraftsTab({ username, posts }: Props) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<"posts" | "drafts">("posts");
   const [drafts, setDrafts] = useState<Post[]>([]);
@@ -31,9 +30,9 @@ export default function ProfileDraftsTab({ username, posts, role }: Props) {
       .catch(() => {});
   }, [username]);
 
-  const canSeeDrafts =
-    isOwnProfile &&
-    (role === "AUTHOR" || role === "ADMIN" || role === "SUPER_ADMIN");
+  // Any signed-in user can write, so anyone viewing their own profile can see
+  // their drafts (role no longer gates this).
+  const canSeeDrafts = isOwnProfile;
 
   // Fetch drafts when the tab is activated (or when canSeeDrafts first becomes true)
   useEffect(() => {

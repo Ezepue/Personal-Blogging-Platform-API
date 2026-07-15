@@ -3,8 +3,103 @@
 import { useState, useRef, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
+import { useToast } from "@/components/ui/Toast";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { formatDate } from "@/lib/format";
+import { api } from "@/lib/api";
 
 type Prefs = { notify_likes: boolean; notify_comments: boolean; notify_follows: boolean };
+type Session = { id: number; created_at: string; expires_at: string };
+
+function SecuritySections() {
+  const { logout } = useAuth();
+  const { toast } = useToast();
+  const { confirm } = useConfirm();
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [deletePw, setDeletePw] = useState("");
+
+  useEffect(() => {
+    api.get<Session[]>("/users/me/sessions").then(setSessions).catch(() => {});
+  }, []);
+
+  const revoke = async (id: number) => {
+    if (!(await confirm({ title: "Revoke this session?", message: "That device will be signed out.", confirmLabel: "Revoke", destructive: true }))) return;
+    await api.del(`/users/me/sessions/${id}`);
+    setSessions((s) => s.filter((x) => x.id !== id));
+    toast("Session revoked", "success");
+  };
+
+  const exportData = async () => {
+    const data = await api.get<unknown>("/users/me/export");
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "quill-export.json";
+    a.click();
+    URL.revokeObjectURL(url);
+    toast("Your data is downloading", "success");
+  };
+
+  const deleteAccount = async () => {
+    if (!deletePw) return;
+    if (!(await confirm({ title: "Delete your account?", message: "Your stories and comments will be hidden and you'll be signed out. This can't be undone.", confirmLabel: "Delete account", destructive: true }))) return;
+    try {
+      await api.del("/users/me", { password: deletePw });
+      toast("Account deleted", "success");
+      logout();
+    } catch {
+      toast("Password is incorrect", "error");
+    }
+  };
+
+  return (
+    <>
+      <div className="bg-surface border border-border rounded-2xl p-6 shadow-soft">
+        <h2 className="font-semibold text-ink mb-1">Active sessions</h2>
+        <p className="text-xs text-muted mb-4">Devices currently signed in to your account.</p>
+        <div className="space-y-2">
+          {sessions.length === 0 && <p className="text-sm text-muted">No active sessions.</p>}
+          {sessions.map((s) => (
+            <div key={s.id} className="flex items-center justify-between text-sm border border-border rounded-lg px-4 py-2.5">
+              <span className="text-ink-soft">Session #{s.id} · started {formatDate(s.created_at)}</span>
+              <button onClick={() => revoke(s.id)} className="text-muted hover:text-red-500 transition-colors">Revoke</button>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="bg-surface border border-border rounded-2xl p-6 shadow-soft">
+        <h2 className="font-semibold text-ink mb-1">Your data</h2>
+        <p className="text-xs text-muted mb-4">Download a JSON copy of your profile, stories, and comments.</p>
+        <button onClick={exportData} className="px-5 py-2 rounded-full border border-border text-ink-soft hover:text-ink hover:border-ink text-sm transition-colors">
+          Export my data
+        </button>
+      </div>
+
+      <div className="bg-surface border border-red-500/40 rounded-2xl p-6 shadow-soft">
+        <h2 className="font-semibold text-red-500 mb-1">Danger zone</h2>
+        <p className="text-xs text-muted mb-4">Deleting your account hides your content and signs you out. Confirm with your password.</p>
+        <div className="flex flex-col sm:flex-row gap-3">
+          <input
+            type="password"
+            value={deletePw}
+            onChange={(e) => setDeletePw(e.target.value)}
+            placeholder="Your password"
+            className="flex-1 bg-raised border border-border rounded-lg px-4 py-2 text-ink focus:outline-none focus:border-red-500 transition-colors"
+          />
+          <button
+            onClick={deleteAccount}
+            disabled={!deletePw}
+            className="px-5 py-2 rounded-full bg-red-600 hover:bg-red-700 disabled:opacity-40 text-white text-sm font-medium transition-colors"
+          >
+            Delete account
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
 
 const inputCls =
   "w-full bg-raised border border-border rounded-lg px-4 py-2 text-ink focus:outline-none focus:border-accent transition-colors";
@@ -155,6 +250,11 @@ export default function SettingsPage() {
     if (res.ok) await refreshUser();
   };
 
+  const removeAvatar = async () => {
+    const res = await fetch("/api/users/me/avatar", { method: "DELETE" });
+    if (res.ok) await refreshUser();
+  };
+
   const initials = user.username[0].toUpperCase();
 
   const prefRows: { key: keyof Prefs; label: string; hint: string }[] = [
@@ -189,6 +289,11 @@ export default function SettingsPage() {
             >
               Upload photo
             </button>
+            {user.avatar_url && (
+              <button onClick={removeAvatar} className="text-sm text-muted hover:text-red-500 transition-colors block mt-0.5">
+                Remove photo
+              </button>
+            )}
             <p className="text-xs text-muted mt-0.5">JPG, PNG or WebP — max 10 MB</p>
           </div>
           <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={uploadAvatar} />
@@ -294,6 +399,8 @@ export default function SettingsPage() {
           {savingPassword ? "Updating…" : "Update password"}
         </button>
       </form>
+
+      <SecuritySections />
     </div>
   );
 }

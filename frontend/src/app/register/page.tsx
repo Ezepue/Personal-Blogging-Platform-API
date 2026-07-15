@@ -3,8 +3,20 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { errorMessage } from "@/lib/api";
 
 type FormState = { username: string; email: string; password: string };
+
+function passwordStrength(pw: string): { score: number; label: string } {
+  let score = 0;
+  if (pw.length >= 8) score++;
+  if (pw.length >= 12) score++;
+  if (/[A-Z]/.test(pw) && /[a-z]/.test(pw)) score++;
+  if (/\d/.test(pw)) score++;
+  if (/[^A-Za-z0-9]/.test(pw)) score++;
+  const label = ["Too short", "Weak", "Fair", "Good", "Strong", "Excellent"][score];
+  return { score, label };
+}
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -29,8 +41,8 @@ export default function RegisterPage() {
       if (res.ok) {
         router.push("/login?registered=1");
       } else {
-        const err = await res.json().catch(() => ({ detail: "Registration failed" }));
-        setError(err.detail ?? "Registration failed");
+        const err = await res.json().catch(() => null);
+        setError(errorMessage(err, "Registration failed"));
       }
     } catch {
       setError("Network error. Please try again.");
@@ -66,6 +78,27 @@ export default function RegisterPage() {
               autoComplete={autoComplete}
               className="w-full bg-surface border border-border rounded-lg px-4 py-2.5 text-ink focus:outline-none focus:border-accent transition-colors"
             />
+            {key === "password" && form.password.length > 0 && (
+              <div className="mt-2 flex items-center gap-2">
+                <div className="flex-1 h-1 rounded-full bg-border overflow-hidden">
+                  <div
+                    className="h-full transition-all"
+                    style={{
+                      width: `${(passwordStrength(form.password).score / 5) * 100}%`,
+                      backgroundColor:
+                        passwordStrength(form.password).score <= 1
+                          ? "#ef4444"
+                          : passwordStrength(form.password).score <= 3
+                          ? "var(--gold)"
+                          : "#22c55e",
+                    }}
+                  />
+                </div>
+                <span className="text-xs text-muted w-16 text-right">
+                  {passwordStrength(form.password).label}
+                </span>
+              </div>
+            )}
           </div>
         ))}
 

@@ -8,10 +8,27 @@ import FollowButton from "@/components/FollowButton";
 import ShareRow from "@/components/ShareRow";
 import ReadingProgress from "@/components/ReadingProgress";
 import TableOfContents from "@/components/TableOfContents";
+import ArticleEnhancer from "@/components/ArticleEnhancer";
+import VerifiedBadge from "@/components/VerifiedBadge";
+import WhoLiked from "@/components/WhoLiked";
 import PostCard, { Post, formatDate } from "@/components/PostCard";
 import type { Metadata } from "next";
 
 const API_URL = process.env.API_URL ?? "http://localhost:8000";
+const SITE_URL = process.env.SITE_URL ?? "http://localhost:3000";
+
+async function getAuthorPosts(username: string, excludeId: number): Promise<Post[]> {
+  try {
+    const res = await fetch(`${API_URL}/users/${username}/articles?limit=4`, {
+      next: { revalidate: 120 },
+    });
+    if (!res.ok) return [];
+    const posts: Post[] = await res.json();
+    return posts.filter((p) => p.id !== excludeId).slice(0, 3);
+  } catch {
+    return [];
+  }
+}
 
 async function getPost(id: string) {
   try {
@@ -69,13 +86,35 @@ export default async function PostPage({
 }: {
   params: { id: string };
 }) {
-  const [post, related] = await Promise.all([getPost(params.id), getRelated(params.id)]);
+  const post = await getPost(params.id);
   if (!post) notFound();
 
   const username: string = post.author?.username ?? "unknown";
+  const [related, authorPosts] = await Promise.all([
+    getRelated(params.id),
+    getAuthorPosts(username, post.id),
+  ]);
+
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    headline: post.title,
+    description: post.subtitle ?? undefined,
+    image: post.cover_image_url ? [post.cover_image_url] : undefined,
+    datePublished: post.published_date ?? undefined,
+    dateModified: post.updated_date ?? undefined,
+    author: { "@type": "Person", name: username, url: `${SITE_URL}/profile/${username}` },
+    mainEntityOfPage: `${SITE_URL}/posts/${post.id}`,
+    wordCount: post.word_count || undefined,
+  };
+
+  // Escape "<" so a title/subtitle containing "</script>" cannot break out of
+  // the JSON-LD script element (JSON.stringify does not escape it).
+  const jsonLdSafe = JSON.stringify(jsonLd).replace(/</g, "\\u003c");
 
   return (
     <>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdSafe }} />
       <ReadingProgress />
 
       <div className="xl:grid xl:grid-cols-[1fr_16rem] xl:gap-12">
@@ -113,8 +152,9 @@ export default async function PostPage({
                   )}
                 </span>
                 <span>
-                  <span className="block text-ink font-medium group-hover:text-accent transition-colors">
+                  <span className="flex items-center gap-1 text-ink font-medium group-hover:text-accent transition-colors">
                     {username}
+                    {post.author?.is_verified && <VerifiedBadge />}
                   </span>
                   <span className="block text-xs">
                     {post.published_date && formatDate(post.published_date)}
@@ -125,6 +165,7 @@ export default async function PostPage({
               </Link>
             </div>
             <div className="flex items-center gap-2">
+              <ArticleEnhancer targetId="article-body" />
               <BookmarkButton articleId={post.id} />
               <ShareRow title={post.title} />
             </div>
@@ -151,11 +192,16 @@ export default async function PostPage({
           />
 
           {/* Engagement row */}
-          <div className="flex items-center gap-3 border-t border-border pt-8 mb-12">
-            <LikeButton articleId={post.id} initialCount={post.likes_count} />
-            <BookmarkButton articleId={post.id} />
-            <div className="ml-auto">
-              <ShareRow title={post.title} />
+          <div className="border-t border-border pt-8 mb-8">
+            <div className="flex items-center gap-3">
+              <LikeButton articleId={post.id} initialCount={post.likes_count} />
+              <BookmarkButton articleId={post.id} />
+              <div className="ml-auto">
+                <ShareRow title={post.title} />
+              </div>
+            </div>
+            <div className="mt-4">
+              <WhoLiked articleId={post.id} />
             </div>
           </div>
 
@@ -173,12 +219,25 @@ export default async function PostPage({
             </Link>
             <div className="flex-1 min-w-0">
               <p className="text-xs uppercase tracking-widest text-muted mb-1">Written by</p>
-              <Link href={`/profile/${username}`} className="font-display text-xl text-ink hover:text-accent transition-colors">
+              <Link href={`/profile/${username}`} className="font-display text-xl text-ink hover:text-accent transition-colors inline-flex items-center gap-1.5">
                 {username}
+                {post.author?.is_verified && <VerifiedBadge />}
               </Link>
             </div>
             <FollowButton username={username} />
           </div>
+
+          {/* More from this author */}
+          {authorPosts.length > 0 && (
+            <section className="mb-14">
+              <h3 className="font-display text-2xl text-ink mb-6">
+                More from <Link href={`/profile/${username}`} className="display-italic hover:underline">{username}</Link>
+              </h3>
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {authorPosts.map((p) => <PostCard key={p.id} post={p} />)}
+              </div>
+            </section>
+          )}
 
           {/* Comments */}
           <CommentSection articleId={post.id} />

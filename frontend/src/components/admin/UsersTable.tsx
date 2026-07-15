@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { errorMessage } from "@/lib/api";
 
 const ASSIGNABLE_ROLES = ["READER", "AUTHOR", "ADMIN"];
 
@@ -50,14 +51,13 @@ export default function UsersTable({
       const res = await fetch(`/api/admin/${userId}/role`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role }),
+        body: JSON.stringify({ new_role: role }),
       });
       if (res.ok) {
         setError(null);
         await load();
       } else {
-        const err = await res.json().catch(() => ({})) as { detail?: string };
-        setError(err.detail ?? "Failed to change role");
+        setError(errorMessage(await res.json().catch(() => null), "Failed to change role"));
       }
     } catch {
       setError("Network error — could not change role");
@@ -75,8 +75,7 @@ export default function UsersTable({
         setError(null);
         await load();
       } else {
-        const err = await res.json().catch(() => ({})) as { detail?: string };
-        setError(err.detail ?? "Failed to delete user");
+        setError(errorMessage(await res.json().catch(() => null), "Failed to delete user"));
       }
     } catch {
       setError("Network error — could not delete user");
